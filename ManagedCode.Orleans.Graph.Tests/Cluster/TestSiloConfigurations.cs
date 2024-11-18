@@ -11,14 +11,12 @@ public class TestSiloConfigurations : ISiloConfigurator
         siloBuilder.AddOrleansGraph()
             .CreateGraph(graph =>
             {
-                graph.AddGrain<IGrainA>()
-                    .From<IGrainA>().To<IGrainB>().Methods(
-                        (a => a.MethodA2, b => b.MethodB1),
-                        (a => a.MethodA2, b => b.MethodB2)
-                    ).WithReentrancy().And()
-                    .From<IGrainA>().To<IGrainC>().AllMethods().And()
-                    .Group("Group1").AddGrain<IGrainA>().AddGrain<IGrainB>().AllowCallsWithin().And()
-                    .AllowAll();
+                graph.AddGrain<IGrainA>();
+                
+                graph.From<IGrainA>()
+                    .To<IGrainB>()
+                    .AllMethods();
+                
             });
     }
 }

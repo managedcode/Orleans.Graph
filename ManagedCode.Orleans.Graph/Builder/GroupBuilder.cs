@@ -8,7 +8,7 @@ public class GroupBuilder : IGroupBuilder
 {
     private readonly GrainCallsBuilder _parent;
     private readonly string _groupName;
-    private readonly HashSet<Type> _groupGrains = new();
+    private readonly HashSet<string> _groupGrains = new();
 
     public GroupBuilder(GrainCallsBuilder parent, string groupName)
     {
@@ -18,7 +18,7 @@ public class GroupBuilder : IGroupBuilder
 
     public IGroupBuilder AddGrain<TGrain>() where TGrain : IGrain
     {
-        _groupGrains.Add(typeof(TGrain));
+        _groupGrains.Add(typeof(TGrain).FullName);
         return this;
     }
 

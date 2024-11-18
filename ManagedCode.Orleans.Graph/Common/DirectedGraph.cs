@@ -51,7 +51,7 @@ public class DirectedGraph<T> where T : class
             .Contains(destination);
     }
 
-    private bool HasCycle()
+    public bool HasCycle()
     {
         var visited = new HashSet<T>();
         var recursionStack = new HashSet<T>();

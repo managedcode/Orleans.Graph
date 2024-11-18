@@ -20,8 +20,8 @@ public static class RequestContextHelper
     {
         var caller = context.SourceId is null
             ? Constants.ClientCallerId
-            : context.SourceContext!.GrainInstance!.GetType()
-                .Name;
+            : context.SourceContext!.GrainInstance!.GetType().Name;
+        
         var call = context.GetCallHistory();
         call.Push(new OutCall(caller, context.InterfaceName, context.MethodName));
         context.SetCallHistory(call);

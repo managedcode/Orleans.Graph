@@ -24,11 +24,13 @@ public static class OrleansCleintGraphExtensions
         return builder;
     }
 
-    public static IClientBuilder CreateGraph(this IClientBuilder builder, Action<GrainGraphManager> graph)
+    public static IClientBuilder CreateGraph(this IClientBuilder builder, Action<IGrainCallsBuilder> graphBuilder)
     {
-        var grainGraph = new GrainGraphManager();
-        graph(grainGraph);
-        builder.ConfigureServices(services => services.AddSingleton(grainGraph));
+        var grainGraph = new GrainCallsBuilder();
+        graphBuilder(grainGraph);
+        var manager = grainGraph.Build();
+        
+        builder.ConfigureServices(services => services.AddSingleton(manager));
         return builder;
     }
 }

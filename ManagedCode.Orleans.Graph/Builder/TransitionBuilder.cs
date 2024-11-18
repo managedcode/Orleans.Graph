@@ -6,9 +6,9 @@ namespace ManagedCode.Orleans.Graph;
 public class TransitionBuilder : ITransitionBuilder
 {
     private readonly GrainCallsBuilder _parent;
-    private readonly Type _sourceType;
+    private readonly string _sourceType;
 
-    public TransitionBuilder(GrainCallsBuilder parent, Type sourceType)
+    public TransitionBuilder(GrainCallsBuilder parent, string sourceType)
     {
         _parent = parent;
         _sourceType = sourceType;
@@ -16,7 +16,7 @@ public class TransitionBuilder : ITransitionBuilder
 
     public IMethodBuilder To<TGrain>() where TGrain : IGrain
     {
-        return new MethodBuilder(_parent, _sourceType, typeof(TGrain));
+        return new MethodBuilder(_parent, _sourceType, typeof(TGrain).FullName);
     }
 
     public IGrainCallsBuilder And() => _parent;

@@ -7,10 +7,10 @@ namespace ManagedCode.Orleans.Graph;
 public class MethodBuilder : IMethodBuilder
 {
     private readonly GrainCallsBuilder _parent;
-    private readonly Type _sourceType;
-    private readonly Type _targetType;
+    private readonly string _sourceType;
+    private readonly string _targetType;
 
-    public MethodBuilder(GrainCallsBuilder parent, Type sourceType, Type targetType)
+    public MethodBuilder(GrainCallsBuilder parent, string sourceType, string targetType)
     {
         _parent = parent;
         _sourceType = sourceType;

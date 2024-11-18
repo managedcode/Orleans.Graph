@@ -29,8 +29,9 @@ public static class OrleansGraphExtensions
     {
         var grainGraph = new GrainCallsBuilder();
         graphBuilder(grainGraph);
+        var manager = grainGraph.Build();
         
-        builder.ConfigureServices(services => services.AddSingleton(grainGraph));
+        builder.ConfigureServices(services => services.AddSingleton(manager));
         return builder;
     }
 }
