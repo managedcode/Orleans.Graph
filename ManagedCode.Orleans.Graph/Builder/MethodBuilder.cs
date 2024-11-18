@@ -15,7 +15,6 @@ public class MethodBuilder : IMethodBuilder
         _parent = parent;
         _sourceType = sourceType;
         _targetType = targetType;
-        _parent.AddTransition(sourceType, targetType);
     }
 
     public IMethodBuilder Method<TSource, TTarget>(Expression<Action<TSource>> source, Expression<Action<TTarget>> target) where TSource : IGrain where TTarget : IGrain

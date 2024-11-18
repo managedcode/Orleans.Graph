@@ -1,107 +1,120 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
+using ManagedCode.Orleans.Graph.Models;
 
 namespace ManagedCode.Orleans.Graph;
 
-public class DirectedGraph<T> where T : class
+public class DirectedGraph
 {
-    private readonly Dictionary<T, HashSet<T>> _adjacencyList;
+    private readonly Dictionary<string, Dictionary<string, HashSet<GrainTransition>>> _adjacencyList;
+    private readonly HashSet<string> _vertices;
     private readonly bool _allowSelfLoops;
-    private readonly HashSet<T> _vertices;
 
     public DirectedGraph(bool allowSelfLoops = false)
     {
         _allowSelfLoops = allowSelfLoops;
-        _adjacencyList = new Dictionary<T, HashSet<T>>();
-        _vertices = new HashSet<T>();
+        _adjacencyList = new Dictionary<string, Dictionary<string, HashSet<GrainTransition>>>();
+        _vertices = new HashSet<string>();
     }
 
-    public void AddVertex(T vertex)
+    public void AddVertex(string vertex)
     {
         if (!_vertices.Contains(vertex))
         {
             _vertices.Add(vertex);
-            _adjacencyList[vertex] = new HashSet<T>();
+            _adjacencyList[vertex] = new Dictionary<string, HashSet<GrainTransition>>();
         }
     }
 
-    public void AddEdge(T source, T destination)
+    public void AddTransition(string source, string target, GrainTransition transition)
     {
-        if (_allowSelfLoops && source.Equals(destination))
+        if (!_allowSelfLoops && source.Equals(target))
             return;
 
-        // Add vertices if they don't exist
         AddVertex(source);
-        AddVertex(destination);
+        AddVertex(target);
 
-        _adjacencyList[source]
-            .Add(destination);
+        if (!_adjacencyList[source].ContainsKey(target))
+        {
+            _adjacencyList[source][target] = new HashSet<GrainTransition>();
+        }
 
-        // Check for cycles immediately when adding edge
+        _adjacencyList[source][target].Add(transition);
+
         if (HasCycle())
-            throw new InvalidOperationException($"Adding edge from {source} to {destination} creates a cycle in the graph.");
+        {
+            _adjacencyList[source][target].Remove(transition);
+            if (!_adjacencyList[source][target].Any())
+            {
+                _adjacencyList[source].Remove(target);
+            }
+            throw new InvalidOperationException($"Adding transition from {source} to {target} creates a cycle");
+        }
     }
 
-    public bool IsTransitionAllowed(T source, T destination)
+    public bool IsTransitionAllowed(string source, string target, string sourceMethod, string targetMethod)
     {
-        if (_allowSelfLoops && source.Equals(destination))
-            return true;
+        if (!_adjacencyList.ContainsKey(source) || !_adjacencyList[source].ContainsKey(target))
+            return false;
 
-        return _adjacencyList.ContainsKey(source) && _adjacencyList[source]
-            .Contains(destination);
+        return _adjacencyList[source][target]
+            .Any(t => t.MatchesMethods(sourceMethod, targetMethod));
     }
 
     public bool HasCycle()
     {
-        var visited = new HashSet<T>();
-        var recursionStack = new HashSet<T>();
+        var visited = new HashSet<string>();
+        var recursionStack = new HashSet<string>();
 
         foreach (var vertex in _vertices)
+        {
             if (IsCyclicUtil(vertex, visited, recursionStack))
                 return true;
-
+        }
         return false;
     }
 
-    private bool IsCyclicUtil(T vertex, HashSet<T> visited, HashSet<T> recursionStack)
+    private bool IsCyclicUtil(string vertex, HashSet<string> visited, HashSet<string> recursionStack)
     {
         if (!visited.Contains(vertex))
         {
             visited.Add(vertex);
             recursionStack.Add(vertex);
 
-            foreach (var neighbor in _adjacencyList[vertex])
+            if (_adjacencyList.ContainsKey(vertex))
             {
-                if (!visited.Contains(neighbor) && IsCyclicUtil(neighbor, visited, recursionStack))
-                    return true;
-
-                if (recursionStack.Contains(neighbor))
-                    return true;
+                foreach (var neighbor in _adjacencyList[vertex].Keys)
+                {
+                    if (!visited.Contains(neighbor) && IsCyclicUtil(neighbor, visited, recursionStack))
+                        return true;
+                    else if (recursionStack.Contains(neighbor))
+                        return true;
+                }
             }
         }
-
         recursionStack.Remove(vertex);
         return false;
     }
 
-    public IEnumerable<T> GetAllVertices()
+    public IEnumerable<(string Source, string Target, HashSet<GrainTransition> Transitions)> GetAllEdges()
     {
-        return _vertices;
-    }
-
-    public IEnumerable<T> GetAdjacentVertices(T vertex)
-    {
-        return _adjacencyList.TryGetValue(vertex, out var value) ? value : [];
-    }
-    
-    public IEnumerable<(T Source, T Target)> GetAllEdges()
-    {
-        foreach (var source in _adjacencyList.Keys)
+        foreach (var source in _vertices)
         {
-            foreach (var target in _adjacencyList[source])
+            foreach (var targetEntry in _adjacencyList[source])
             {
-                yield return (source, target);
+                yield return (source, targetEntry.Key, targetEntry.Value);
             }
         }
     }
+
+    public bool HasVertex(string vertex) => _vertices.Contains(vertex);
+
+    public bool HasEdge(string source, string target) => 
+        _adjacencyList.ContainsKey(source) && _adjacencyList[source].ContainsKey(target);
+
+    public IEnumerable<string> GetVertices() => _vertices;
+
+    public IEnumerable<string> GetNeighbors(string vertex) =>
+        _adjacencyList.ContainsKey(vertex) ? _adjacencyList[vertex].Keys : Enumerable.Empty<string>();
 }
