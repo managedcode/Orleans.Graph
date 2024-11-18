@@ -8,18 +8,17 @@ public class TestSiloConfigurations : ISiloConfigurator
 {
     public void Configure(ISiloBuilder siloBuilder)
     {
-         siloBuilder.AddOrleansGraph()
-            .CreateGraph(graph => graph
-            .AddAllowedTransition<IGrainA, IGrainB>()
-            .AddAllowedTransition<IGrainA, IGrainC>()
-            
-            // .AddAllowedTransition<IGrainB, IGrainC>()
-            //
-            // .AddAllowedTransition<IGrainC, IGrainA>()
-            //
-            // .AddAllowedTransition<IGrainD, IGrainE>()
-            // .AddAllowedTransition<IGrainE, IGrainD>()
-            );
+        siloBuilder.AddOrleansGraph()
+            .CreateGraph(graph => graph.AddAllowedTransition<IGrainA>()
+                    .AddAllowedTransition<IGrainA, IGrainB>()
+                    .AddAllowedTransition<IGrainA, IGrainC>()
 
+                // .AddAllowedTransition<IGrainB, IGrainC>()
+                //
+                // .AddAllowedTransition<IGrainC, IGrainA>()
+                //
+                // .AddAllowedTransition<IGrainD, IGrainE>()
+                // .AddAllowedTransition<IGrainE, IGrainD>()
+            );
     }
 }

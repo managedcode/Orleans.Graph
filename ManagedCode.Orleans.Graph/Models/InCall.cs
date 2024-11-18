@@ -5,4 +5,4 @@ namespace ManagedCode.Orleans.Graph.Models;
 [Immutable]
 [GenerateSerializer]
 [Alias("MC.InCall")]
-public class InCall(string method) : Call(Direction.In, method);
+public class InCall(string type, string method) : Call(Direction.In, type, method);

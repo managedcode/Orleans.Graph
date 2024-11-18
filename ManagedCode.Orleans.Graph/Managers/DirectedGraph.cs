@@ -1,22 +1,17 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using Orleans;
+﻿using System;
+using System.Collections.Generic;
 
 namespace ManagedCode.Orleans.Graph;
-
-using System;
-using System.Collections.Generic;
-using System.Linq;
 
 public class DirectedGraph<T> where T : class
 {
     private readonly Dictionary<T, HashSet<T>> _adjacencyList;
+    private readonly bool _allowSelfLoops;
     private readonly HashSet<T> _vertices;
 
-    public DirectedGraph()
+    public DirectedGraph(bool allowSelfLoops = false)
     {
+        _allowSelfLoops = allowSelfLoops;
         _adjacencyList = new Dictionary<T, HashSet<T>>();
         _vertices = new HashSet<T>();
     }
@@ -32,22 +27,28 @@ public class DirectedGraph<T> where T : class
 
     public void AddEdge(T source, T destination)
     {
+        if (_allowSelfLoops && source.Equals(destination))
+            return;
+
         // Add vertices if they don't exist
         AddVertex(source);
         AddVertex(destination);
 
-        _adjacencyList[source].Add(destination);
-        
+        _adjacencyList[source]
+            .Add(destination);
+
         // Check for cycles immediately when adding edge
         if (HasCycle())
-        {
-            throw new InvalidOperationException($"Adding edge from {source} to {destination} creates a cycle in the graph");
-        }
+            throw new InvalidOperationException($"Adding edge from {source} to {destination} creates a cycle in the graph.");
     }
 
     public bool IsTransitionAllowed(T source, T destination)
     {
-        return _adjacencyList.ContainsKey(source) && _adjacencyList[source].Contains(destination);
+        if (_allowSelfLoops && source.Equals(destination))
+            return true;
+
+        return _adjacencyList.ContainsKey(source) && _adjacencyList[source]
+            .Contains(destination);
     }
 
     private bool HasCycle()
@@ -56,12 +57,8 @@ public class DirectedGraph<T> where T : class
         var recursionStack = new HashSet<T>();
 
         foreach (var vertex in _vertices)
-        {
             if (IsCyclicUtil(vertex, visited, recursionStack))
-            {
                 return true;
-            }
-        }
 
         return false;
     }
@@ -76,13 +73,10 @@ public class DirectedGraph<T> where T : class
             foreach (var neighbor in _adjacencyList[vertex])
             {
                 if (!visited.Contains(neighbor) && IsCyclicUtil(neighbor, visited, recursionStack))
-                {
                     return true;
-                }
-                else if (recursionStack.Contains(neighbor))
-                {
+
+                if (recursionStack.Contains(neighbor))
                     return true;
-                }
             }
         }
 
@@ -90,38 +84,13 @@ public class DirectedGraph<T> where T : class
         return false;
     }
 
-    public IEnumerable<T> GetAllVertices() => _vertices;
-    
+    public IEnumerable<T> GetAllVertices()
+    {
+        return _vertices;
+    }
+
     public IEnumerable<T> GetAdjacentVertices(T vertex)
     {
         return _adjacencyList.TryGetValue(vertex, out var value) ? value : [];
     }
 }
-
-[GrainGraphConfiguration]
-public class GrainGraphManager
-{
-    private readonly DirectedGraph<Type> _grainGraph;
-
-    public GrainGraphManager()
-    {
-        _grainGraph = new DirectedGraph<Type>();
-    }
-
-    public GrainGraphManager AddAllowedTransition(Type sourceGrain, Type targetGrain)
-    {
-        _grainGraph.AddEdge(sourceGrain, targetGrain);
-        return this;
-    }
-    
-    public GrainGraphManager AddAllowedTransition<T1, T2>()
-    {
-        return AddAllowedTransition(typeof(T1), typeof(T2));
-    }
-
-    public bool IsTransitionAllowed(Type sourceGrain, Type targetGrain)
-    {
-        return _grainGraph.IsTransitionAllowed(sourceGrain, targetGrain);
-    }
-}
-

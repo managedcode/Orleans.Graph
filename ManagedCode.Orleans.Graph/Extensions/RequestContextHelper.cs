@@ -1,4 +1,4 @@
-using System.Linq;
+using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
 using Orleans;
 using Orleans.Runtime;
@@ -7,48 +7,55 @@ namespace ManagedCode.Orleans.Graph.Extensions;
 
 public static class RequestContextHelper
 {
-    public static void TrackIncomingCall(this IIncomingGrainCallContext context)
+    public static bool TrackIncomingCall(this IIncomingGrainCallContext context)
     {
-        CallHistory call = context.GetCallHistory();
-        call.Push( new InCall($"{context.Request.GetInterfaceName()}.{context.Request.GetMethod().Name}"));
+        var call = context.GetCallHistory();
+        //var caller = context.TargetContext!.GrainInstance!.GetType().Name;
+        call.Push(new InCall(context.InterfaceName, context.MethodName));
         context.SetCallHistory(call);
+        return true;
     }
-    
-    public static void TrackIncomingCall(this IIncomingGrainCallContext context, GraphCallFilterConfig graphCallFilterConfig)
+
+    public static bool TrackOutgoingCall(this IOutgoingGrainCallContext context)
     {
-        if(!graphCallFilterConfig.TrackOrleansCalls && context.Request.GetType().Namespace!.Contains("Orleans"))
-            return;
-        
-        context.TrackIncomingCall();
-    }
-    
-    public static void TrackOutgoingCall(this IOutgoingGrainCallContext context, GraphCallFilterConfig graphCallFilterConfig)
-    {
-        if(!graphCallFilterConfig.TrackOrleansCalls && context.InterfaceName.Contains("Orleans"))
-            return;
-            
-        context.TrackOutgoingCall();
-    }
-    
-    public static void TrackOutgoingCall(this IOutgoingGrainCallContext context)
-    {
-        CallHistory call = context.GetCallHistory();
-        call.Push( new OutCall(context.SourceContext?.GrainInstance?.GetType().Name ?? Interfaces.Constants.ClientCallerId, $"{context.Request.GetInterfaceName()}.{context.Request.GetMethod().Name}"));
+        var caller = context.SourceId is null
+            ? Constants.ClientCallerId
+            : context.SourceContext!.GrainInstance!.GetType()
+                .Name;
+        var call = context.GetCallHistory();
+        call.Push(new OutCall(caller, context.InterfaceName, context.MethodName));
         context.SetCallHistory(call);
+        return true;
     }
-    
+
+    public static bool TrackIncomingCall(this IIncomingGrainCallContext context, GraphCallFilterConfig graphCallFilterConfig)
+    {
+        if (!graphCallFilterConfig.TrackOrleansCalls && context.ImplementationMethod.Module.Name.StartsWith("Orleans."))
+            return false;
+
+        return context.TrackIncomingCall();
+    }
+
+    public static bool TrackOutgoingCall(this IOutgoingGrainCallContext context, GraphCallFilterConfig graphCallFilterConfig)
+    {
+        if (!graphCallFilterConfig.TrackOrleansCalls && context.InterfaceMethod.Module.Name.StartsWith("Orleans."))
+            return false;
+
+        return context.TrackOutgoingCall();
+    }
+
     public static CallHistory GetCallHistory(this IGrainCallContext context)
     {
-        return RequestContext.Get(Interfaces.Constants.RequestContextKey) as CallHistory ?? new CallHistory();
+        return RequestContext.Get(Constants.RequestContextKey) as CallHistory ?? new CallHistory();
     }
-    
+
     public static bool IsCallHistoryExist(this IGrainCallContext context)
     {
-        return RequestContext.Get(Interfaces.Constants.RequestContextKey) is CallHistory;
+        return RequestContext.Get(Constants.RequestContextKey) is CallHistory;
     }
-    
+
     public static void SetCallHistory(this IGrainCallContext context, CallHistory callHistory)
     {
-        RequestContext.Set(Interfaces.Constants.RequestContextKey, callHistory);
+        RequestContext.Set(Constants.RequestContextKey, callHistory);
     }
 }

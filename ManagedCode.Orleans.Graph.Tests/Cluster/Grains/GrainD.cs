@@ -11,6 +11,7 @@ public class GrainD : Grain, IGrainD
 
     public async Task<int> MethodE2(int input)
     {
-        return await GrainFactory.GetGrain<IGrainE>(this.GetPrimaryKeyString()).MethodE1(input);
+        return await GrainFactory.GetGrain<IGrainE>(this.GetPrimaryKeyString())
+            .MethodE1(input);
     }
 }
