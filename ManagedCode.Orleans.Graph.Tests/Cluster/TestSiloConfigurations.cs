@@ -10,8 +10,16 @@ public class TestSiloConfigurations : ISiloConfigurator
     {
          siloBuilder.AddOrleansGraph()
             .CreateGraph(graph => graph
-            .AddTransition<IGrainA, IGrainB>(TransitionDirection.OneWay)
-            .AddTransition<IGrainB, IGrainC>(TransitionDirection.BiDirectional));
+            .AddAllowedTransition<IGrainA, IGrainB>()
+            .AddAllowedTransition<IGrainA, IGrainC>()
+            
+            // .AddAllowedTransition<IGrainB, IGrainC>()
+            //
+            // .AddAllowedTransition<IGrainC, IGrainA>()
+            //
+            // .AddAllowedTransition<IGrainD, IGrainE>()
+            // .AddAllowedTransition<IGrainE, IGrainD>()
+            );
 
     }
 }

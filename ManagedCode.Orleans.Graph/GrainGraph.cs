@@ -1,5 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -7,130 +6,122 @@ using Orleans;
 
 namespace ManagedCode.Orleans.Graph;
 
-// Direction type for transitions
-public enum TransitionDirection
-{
-    OneWay,
-    BiDirectional
-}
+using System;
+using System.Collections.Generic;
+using System.Linq;
 
-// Interface for defining transitions
-public interface IGraphBuilder
+public class DirectedGraph<T> where T : class
 {
-    // Add single transition
-    IGraphBuilder AddTransition<TFrom, TTo>(TransitionDirection direction = TransitionDirection.OneWay) 
-        where TFrom : IGrain 
-        where TTo : IGrain;
-    
-    // Add multiple transitions at once
-    IGraphBuilder AddTransitions<TGrain>(params Type[] targetGrainTypes) 
-        where TGrain : IGrain;
-    
-    // Check if transition is allowed
-    bool IsTransitionAllowed<TFrom, TTo>() 
-        where TFrom : IGrain 
-        where TTo : IGrain;
-}
+    private readonly Dictionary<T, HashSet<T>> _adjacencyList;
+    private readonly HashSet<T> _vertices;
 
-// Internal storage implementation 
-public class GrainGraphManager : IGraphBuilder
-{
-    private readonly HashSet<(Type From, Type To)> _allowedTransitions = new();
-    
-    public IGraphBuilder AddTransition<TFrom, TTo>(TransitionDirection direction = TransitionDirection.OneWay)
-        where TFrom : IGrain
-        where TTo : IGrain
+    public DirectedGraph()
     {
-        _allowedTransitions.Add((typeof(TFrom), typeof(TTo)));
-        
-        if (direction == TransitionDirection.BiDirectional)
+        _adjacencyList = new Dictionary<T, HashSet<T>>();
+        _vertices = new HashSet<T>();
+    }
+
+    public void AddVertex(T vertex)
+    {
+        if (!_vertices.Contains(vertex))
         {
-            _allowedTransitions.Add((typeof(TTo), typeof(TFrom)));
+            _vertices.Add(vertex);
+            _adjacencyList[vertex] = new HashSet<T>();
         }
+    }
+
+    public void AddEdge(T source, T destination)
+    {
+        // Add vertices if they don't exist
+        AddVertex(source);
+        AddVertex(destination);
+
+        _adjacencyList[source].Add(destination);
         
-        return this;
-    }
-    
-    public IGraphBuilder AddTransitions<TGrain>(params Type[] targetGrainTypes) 
-        where TGrain : IGrain
-    {
-        foreach (var targetType in targetGrainTypes)
+        // Check for cycles immediately when adding edge
+        if (HasCycle())
         {
-            _allowedTransitions.Add((typeof(TGrain), targetType));
+            throw new InvalidOperationException($"Adding edge from {source} to {destination} creates a cycle in the graph");
         }
-        return this;
     }
-    
-    public bool IsTransitionAllowed<TFrom, TTo>()
-        where TFrom : IGrain
-        where TTo : IGrain
+
+    public bool IsTransitionAllowed(T source, T destination)
     {
-        return _allowedTransitions.Contains((typeof(TFrom), typeof(TTo)));
+        return _adjacencyList.ContainsKey(source) && _adjacencyList[source].Contains(destination);
     }
-    
-    public bool IsTransitionAllowed(Type? fromType, Type? toType)
+
+    private bool HasCycle()
     {
-        if (fromType == null || toType == null)
+        var visited = new HashSet<T>();
+        var recursionStack = new HashSet<T>();
+
+        foreach (var vertex in _vertices)
         {
-            return false;
-        }
-        return _allowedTransitions.Contains((fromType, toType));
-    }
-}
-
-
-public record GrainTransitionKey(string FromInterface, string MethodName, string ToInterface);
-
-public interface IGrainGraph
-{
-    IGrainGraph AddTransition<TFrom, TTo>(string methodName, TransitionDirection direction = TransitionDirection.OneWay)
-        where TFrom : IGrain
-        where TTo : IGrain;
-        
-    bool IsTransitionAllowed(string fromInterface, string methodName, string toInterface);
-    
-    IReadOnlyCollection<GrainTransitionKey> GetAllowedTransitions();
-}
-
-public class GrainGraph : IGrainGraph
-{
-    private readonly HashSet<GrainTransitionKey> _allowedTransitions = new();
-    private readonly object _lock = new();
-
-    public IGrainGraph AddTransition<TFrom, TTo>(string methodName, TransitionDirection direction = TransitionDirection.OneWay) 
-        where TFrom : IGrain 
-        where TTo : IGrain
-    {
-        var fromType = typeof(TFrom).Name;
-        var toType = typeof(TTo).Name;
-
-        lock (_lock)
-        {
-            _allowedTransitions.Add(new GrainTransitionKey(fromType, methodName, toType));
-
-            if (direction == TransitionDirection.BiDirectional)
+            if (IsCyclicUtil(vertex, visited, recursionStack))
             {
-                _allowedTransitions.Add(new GrainTransitionKey(toType, methodName, fromType));
+                return true;
             }
         }
 
-        return this;
+        return false;
     }
 
-    public bool IsTransitionAllowed(string fromInterface, string methodName, string toInterface)
+    private bool IsCyclicUtil(T vertex, HashSet<T> visited, HashSet<T> recursionStack)
     {
-        var key = new GrainTransitionKey(fromInterface, methodName, toInterface);
-        lock (_lock)
+        if (!visited.Contains(vertex))
         {
-            return _allowedTransitions.Contains(key);
+            visited.Add(vertex);
+            recursionStack.Add(vertex);
+
+            foreach (var neighbor in _adjacencyList[vertex])
+            {
+                if (!visited.Contains(neighbor) && IsCyclicUtil(neighbor, visited, recursionStack))
+                {
+                    return true;
+                }
+                else if (recursionStack.Contains(neighbor))
+                {
+                    return true;
+                }
+            }
         }
+
+        recursionStack.Remove(vertex);
+        return false;
     }
 
-    public IReadOnlyCollection<GrainTransitionKey> GetAllowedTransitions()
+    public IEnumerable<T> GetAllVertices() => _vertices;
+    
+    public IEnumerable<T> GetAdjacentVertices(T vertex)
     {
-        lock (_lock)
-        {
-            return _allowedTransitions.ToList().AsReadOnly();
-        }
+        return _adjacencyList.TryGetValue(vertex, out var value) ? value : [];
     }
 }
+
+[GrainGraphConfiguration]
+public class GrainGraphManager
+{
+    private readonly DirectedGraph<Type> _grainGraph;
+
+    public GrainGraphManager()
+    {
+        _grainGraph = new DirectedGraph<Type>();
+    }
+
+    public GrainGraphManager AddAllowedTransition(Type sourceGrain, Type targetGrain)
+    {
+        _grainGraph.AddEdge(sourceGrain, targetGrain);
+        return this;
+    }
+    
+    public GrainGraphManager AddAllowedTransition<T1, T2>()
+    {
+        return AddAllowedTransition(typeof(T1), typeof(T2));
+    }
+
+    public bool IsTransitionAllowed(Type sourceGrain, Type targetGrain)
+    {
+        return _grainGraph.IsTransitionAllowed(sourceGrain, targetGrain);
+    }
+}
+

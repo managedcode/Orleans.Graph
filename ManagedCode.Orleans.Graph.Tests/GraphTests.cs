@@ -16,6 +16,15 @@ public class GraphTests
         _testApp = testApp;
         _outputHelper = outputHelper;
     }
+    
+    [Fact]
+    public async Task GrainA_B1Test()
+    {
+        await _testApp.Cluster
+            .Client
+            .GetGrain<IGrainA>("1")
+            .MethodB1(1);
+    }
 
     [Fact]
     public async Task GrainATest()
