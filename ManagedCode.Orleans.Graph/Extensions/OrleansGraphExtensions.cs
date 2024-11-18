@@ -25,10 +25,11 @@ public static class OrleansGraphExtensions
         return builder;
     }
 
-    public static ISiloBuilder CreateGraph(this ISiloBuilder builder, Action<GrainGraphManager> graph)
+    public static ISiloBuilder CreateGraph(this ISiloBuilder builder, Action<IGrainCallsBuilder> graphBuilder)
     {
-        var grainGraph = new GrainGraphManager();
-        graph(grainGraph);
+        var grainGraph = new GrainCallsBuilder();
+        graphBuilder(grainGraph);
+        
         builder.ConfigureServices(services => services.AddSingleton(grainGraph));
         return builder;
     }

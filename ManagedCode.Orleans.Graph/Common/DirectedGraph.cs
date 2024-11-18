@@ -93,4 +93,15 @@ public class DirectedGraph<T> where T : class
     {
         return _adjacencyList.TryGetValue(vertex, out var value) ? value : [];
     }
+    
+    public IEnumerable<(T Source, T Target)> GetAllEdges()
+    {
+        foreach (var source in _adjacencyList.Keys)
+        {
+            foreach (var target in _adjacencyList[source])
+            {
+                yield return (source, target);
+            }
+        }
+    }
 }
