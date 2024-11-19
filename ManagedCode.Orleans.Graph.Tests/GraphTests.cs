@@ -74,15 +74,22 @@ public class GraphTests
             .Client
             .GetGrain<IGrainA>("1")
             .MethodB1(1);
+        
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        {
+            await _testApp.Cluster
+                .Client
+                .GetGrain<IGrainA>("1")
+                .MethodC1(1);
+        });
 
-        await _testApp.Cluster
-            .Client
-            .GetGrain<IGrainA>("1")
-            .MethodC1(1);
+        exception.Message
+            .Should()
+            .StartWith("Transition is not allowed.");
     }
 
     [Fact]
-    public async Task TestGrainTests()
+    public async Task DeadLock_Tests()
     {
         await _testApp.Cluster
             .Client
