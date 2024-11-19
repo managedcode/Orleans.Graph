@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Orleans;
+using Orleans.Runtime;
 
 namespace ManagedCode.Orleans.Graph.Models;
 
@@ -7,7 +8,7 @@ namespace ManagedCode.Orleans.Graph.Models;
 [GenerateSerializer]
 [Alias("MC.Call")]
 [DebuggerDisplay("{ToString()}")]
-public class Call(Direction direction, string type, string method)
+public class Call(GrainId? sourceId, GrainId? targetId, Direction direction, string type, string method)
 {
     [Id(0)]
     public Direction Direction { get; set; } = direction;
@@ -17,6 +18,12 @@ public class Call(Direction direction, string type, string method)
 
     [Id(2)]
     public string Method { get; set; } = method;
+    
+    [Id(3)]
+    public GrainId? SourceId { get; set; } = sourceId;
+    
+    [Id(5)]
+    public GrainId? TargetId { get; set; } = targetId;
     
     public override string ToString()
     {

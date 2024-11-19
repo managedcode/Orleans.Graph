@@ -49,7 +49,7 @@ public class GraphTests
 
         exception.Message
             .Should()
-            .StartWith("Transition is not allowed.");
+            .StartWith("Transition from ORLEANS_GRAIN_CLIENT to ManagedCode.Orleans.Graph.Tests.Cluster.Grains.Interfaces.IGrainC is not allowed.");
     }
     
 
@@ -85,15 +85,22 @@ public class GraphTests
 
         exception.Message
             .Should()
-            .StartWith("Transition is not allowed.");
+            .StartWith("Transition from");
     }
 
     [Fact]
     public async Task DeadLock_Tests()
     {
-        await _testApp.Cluster
-            .Client
-            .GetGrain<IGrainA>("1")
-            .MethodB2(1);
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        {
+            await _testApp.Cluster
+                .Client
+                .GetGrain<IGrainA>("1")
+                .MethodB2(1);
+        });
+
+        exception.Message
+            .Should()
+            .StartWith("Deadlock detected.");
     }
 }

@@ -19,8 +19,8 @@ public void IsTransitionAllowed_SingleValidTransition_ReturnsTrue()
         .Build();
 
     var callHistory = new CallHistory();
-    callHistory.Push(new Call(Direction.Out, typeof(IGrainA).FullName, nameof(IGrainA.MethodA1)));
-    callHistory.Push(new Call(Direction.In, typeof(IGrainB).FullName, nameof(IGrainB.MethodB1)));
+    callHistory.Push(new Call(null, null, Direction.Out, typeof(IGrainA).FullName, nameof(IGrainA.MethodA1)));
+    callHistory.Push(new Call(null, null, Direction.In, typeof(IGrainB).FullName, nameof(IGrainB.MethodB1)));
 
     Assert.True(graph.IsTransitionAllowed(callHistory));
 }
@@ -36,8 +36,8 @@ public void IsTransitionAllowed_InvalidTransition_ReturnsFalse()
         .Build();
 
     var callHistory = new CallHistory();
-    callHistory.Push(new Call(Direction.Out, typeof(IGrainA).FullName, nameof(IGrainA.MethodA1)));
-    callHistory.Push(new Call(Direction.In, typeof(IGrainB).FullName, nameof(IGrainB.MethodB1)));
+    callHistory.Push(new Call(null, null, Direction.Out, typeof(IGrainA).FullName, nameof(IGrainA.MethodA1)));
+    callHistory.Push(new Call(null, null, Direction.In, typeof(IGrainB).FullName, nameof(IGrainB.MethodB1)));
 
     Assert.False(graph.IsTransitionAllowed(callHistory));
 }
@@ -72,8 +72,8 @@ public void IsTransitionAllowed_ReentrancyAllowed_ReturnsTrue()
         .Build();
 
     var callHistory = new CallHistory();
-    callHistory.Push(new Call(Direction.Out, typeof(IGrainA).FullName, nameof(IGrainA.MethodA1)));
-    callHistory.Push(new Call(Direction.In, typeof(IGrainB).FullName, nameof(IGrainB.MethodB1)));
+    callHistory.Push(new Call(null, null, Direction.Out, typeof(IGrainA).FullName, nameof(IGrainA.MethodA1)));
+    callHistory.Push(new Call(null, null, Direction.In, typeof(IGrainB).FullName, nameof(IGrainB.MethodB1)));
 
     Assert.True(graph.IsTransitionAllowed(callHistory));
 }
@@ -89,8 +89,8 @@ public void IsTransitionAllowed_MethodRuleAllowed_ReturnsTrue()
         .Build();
 
     var callHistory = new CallHistory();
-    callHistory.Push(new Call(Direction.Out, typeof(IGrainA).FullName, nameof(IGrainA.MethodA1)));
-    callHistory.Push(new Call(Direction.In, typeof(IGrainB).FullName, nameof(IGrainB.MethodB1)));
+    callHistory.Push(new Call(null, null, Direction.Out, typeof(IGrainA).FullName, nameof(IGrainA.MethodA1)));
+    callHistory.Push(new Call(null, null, Direction.In, typeof(IGrainB).FullName, nameof(IGrainB.MethodB1)));
 
     Assert.True(graph.IsTransitionAllowed(callHistory));
 }
@@ -105,8 +105,8 @@ public void IsTransitionAllowed_SelfLoopTransition_ReturnsTrue()
         .Build();
 
     var callHistory = new CallHistory();
-    callHistory.Push(new Call(Direction.Out, typeof(IGrainA).FullName, nameof(IGrainA.MethodA1)));
-    callHistory.Push(new Call(Direction.In, typeof(IGrainA).FullName, nameof(IGrainA.MethodA1)));
+    callHistory.Push(new Call(null, null, Direction.Out, typeof(IGrainA).FullName, nameof(IGrainA.MethodA1)));
+    callHistory.Push(new Call(null, null, Direction.In, typeof(IGrainA).FullName, nameof(IGrainA.MethodA1)));
 
     Assert.True(graph.IsTransitionAllowed(callHistory));
 }
@@ -122,8 +122,8 @@ public void IsTransitionAllowed_DisallowedTransition_ReturnsFalse()
         .Build();
 
     var callHistory = new CallHistory();
-    callHistory.Push(new Call(Direction.Out, typeof(IGrainA).FullName, nameof(IGrainA.MethodA1)));
-    callHistory.Push(new Call(Direction.In, typeof(IGrainC).FullName, nameof(IGrainC.MethodC1)));
+    callHistory.Push(new Call(null, null, Direction.Out, typeof(IGrainA).FullName, nameof(IGrainA.MethodA1)));
+    callHistory.Push(new Call(null, null, Direction.In, typeof(IGrainC).FullName, nameof(IGrainC.MethodC1)));
 
     Assert.False(graph.IsTransitionAllowed(callHistory));
 }
@@ -143,10 +143,10 @@ public void IsTransitionAllowed_MultipleValidTransitions_ReturnsTrue()
         .Build();
 
     var callHistory = new CallHistory();
-    callHistory.Push(new Call(Direction.Out, typeof(IGrainA).FullName, nameof(IGrainA.MethodA1)));
-    callHistory.Push(new Call(Direction.In, typeof(IGrainB).FullName, nameof(IGrainB.MethodB1)));
-    callHistory.Push(new Call(Direction.Out, typeof(IGrainB).FullName, nameof(IGrainB.MethodB1)));
-    callHistory.Push(new Call(Direction.In, typeof(IGrainC).FullName, nameof(IGrainC.MethodC1)));
+    callHistory.Push(new Call(null, null, Direction.Out, typeof(IGrainA).FullName, nameof(IGrainA.MethodA1)));
+    callHistory.Push(new Call(null, null, Direction.In, typeof(IGrainB).FullName, nameof(IGrainB.MethodB1)));
+    callHistory.Push(new Call(null, null, Direction.Out, typeof(IGrainB).FullName, nameof(IGrainB.MethodB1)));
+    callHistory.Push(new Call(null, null, Direction.In, typeof(IGrainC).FullName, nameof(IGrainC.MethodC1)));
 
     Assert.True(graph.IsTransitionAllowed(callHistory));
 }
@@ -162,8 +162,8 @@ public void IsTransitionAllowed_InvalidMethodRule_ReturnsFalse()
         .Build();
 
     var callHistory = new CallHistory();
-    callHistory.Push(new Call(Direction.Out, typeof(IGrainA).FullName, nameof(IGrainA.MethodA1)));
-    callHistory.Push(new Call(Direction.In, typeof(IGrainB).FullName, "MethodC2"));
+    callHistory.Push(new Call(null, null, Direction.Out, typeof(IGrainA).FullName, nameof(IGrainA.MethodA1)));
+    callHistory.Push(new Call(null, null, Direction.In, typeof(IGrainB).FullName, "MethodC2"));
 
     Assert.False(graph.IsTransitionAllowed(callHistory));
 }
@@ -212,12 +212,12 @@ public void IsTransitionAllowed_DetectsSimpleLoop_ReturnsFalse()
         .Build();
 
     var callHistory = new CallHistory();
-    callHistory.Push(new Call(Direction.Out, typeof(IGrainA).FullName, nameof(IGrainA.MethodA1)));
-    callHistory.Push(new Call(Direction.In, typeof(IGrainB).FullName, nameof(IGrainB.MethodB1)));
-    callHistory.Push(new Call(Direction.Out, typeof(IGrainB).FullName, nameof(IGrainB.MethodB1)));
-    callHistory.Push(new Call(Direction.In, typeof(IGrainC).FullName, nameof(IGrainC.MethodC1)));
-    callHistory.Push(new Call(Direction.Out, typeof(IGrainC).FullName, nameof(IGrainC.MethodC1)));
-    callHistory.Push(new Call(Direction.In, typeof(IGrainA).FullName, nameof(IGrainA.MethodA1)));
+    callHistory.Push(new Call(null, null, Direction.Out, typeof(IGrainA).FullName, nameof(IGrainA.MethodA1)));
+    callHistory.Push(new Call(null, null, Direction.In, typeof(IGrainB).FullName, nameof(IGrainB.MethodB1)));
+    callHistory.Push(new Call(null, null, Direction.Out, typeof(IGrainB).FullName, nameof(IGrainB.MethodB1)));
+    callHistory.Push(new Call(null, null, Direction.In, typeof(IGrainC).FullName, nameof(IGrainC.MethodC1)));
+    callHistory.Push(new Call(null, null, Direction.Out, typeof(IGrainC).FullName, nameof(IGrainC.MethodC1)));
+    callHistory.Push(new Call(null, null, Direction.In, typeof(IGrainA).FullName, nameof(IGrainA.MethodA1)));
 
     Assert.False(graph.IsTransitionAllowed(callHistory));
 }
@@ -237,10 +237,10 @@ public void IsTransitionAllowed_NoLoop_ReturnsTrue()
         .Build();
 
     var callHistory = new CallHistory();
-    callHistory.Push(new Call(Direction.Out, typeof(IGrainA).FullName, nameof(IGrainA.MethodA1)));
-    callHistory.Push(new Call(Direction.In, typeof(IGrainB).FullName, nameof(IGrainB.MethodB1)));
-    callHistory.Push(new Call(Direction.Out, typeof(IGrainB).FullName, nameof(IGrainB.MethodB1)));
-    callHistory.Push(new Call(Direction.In, typeof(IGrainC).FullName, nameof(IGrainC.MethodC1)));
+    callHistory.Push(new Call(null, null, Direction.Out, typeof(IGrainA).FullName, nameof(IGrainA.MethodA1)));
+    callHistory.Push(new Call(null, null, Direction.In, typeof(IGrainB).FullName, nameof(IGrainB.MethodB1)));
+    callHistory.Push(new Call(null, null, Direction.Out, typeof(IGrainB).FullName, nameof(IGrainB.MethodB1)));
+    callHistory.Push(new Call(null, null, Direction.In, typeof(IGrainC).FullName, nameof(IGrainC.MethodC1)));
 
     Assert.True(graph.IsTransitionAllowed(callHistory));
 }

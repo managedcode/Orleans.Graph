@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using ManagedCode.Orleans.Graph.Models;
+using Orleans.Runtime;
 
 namespace ManagedCode.Orleans.Graph;
 
@@ -14,13 +14,15 @@ public class GrainTransitionManager
         _grainGraph = grainGraph ?? throw new ArgumentNullException(nameof(grainGraph));
     }
 
-    public bool IsTransitionAllowed(CallHistory callHistory)
+    public bool IsTransitionAllowed(CallHistory callHistory, bool throwOnViolation = false)
     {
         if (callHistory.IsEmpty())
+        {
             return false;
+        }
 
         var calls = callHistory.History.ToArray();
-        var visited = new HashSet<string>();
+
 
         for (var i = 0; i < calls.Length - 1; i++)
         {
@@ -30,28 +32,15 @@ public class GrainTransitionManager
             // Only consider transitions from Out to In
             if (currentCall.Direction == Direction.Out && nextCall.Direction == Direction.In)
             {
-                string transitionKey;
-                if (currentCall is OutCall outCall)
-                {
-                    transitionKey = $"{outCall.Caller}->{nextCall.Interface}";
-                }
-                else
-                {
-                    transitionKey = $"{currentCall.Interface}->{nextCall.Interface}";
-                }
-
-                // Check for cycles
-                if (visited.Contains(transitionKey))
-                {
-                    return false;
-                }
-                visited.Add(transitionKey);
-
                 // Check if the transition is allowed
                 if (currentCall is OutCall outCallTransition)
                 {
                     if (!_grainGraph.IsTransitionAllowed(outCallTransition.Caller, nextCall.Interface, currentCall.Method, nextCall.Method))
                     {
+                        if(throwOnViolation)
+                        {
+                            throw new InvalidOperationException($"Transition from {outCallTransition.Caller} to {nextCall.Interface} is not allowed.");
+                        }
                         return false;
                     }
                 }
@@ -59,12 +48,82 @@ public class GrainTransitionManager
                 {
                     if (!_grainGraph.IsTransitionAllowed(currentCall.Interface, nextCall.Interface, currentCall.Method, nextCall.Method))
                     {
+                        if(throwOnViolation)
+                        {
+                            throw new InvalidOperationException($"Transition from {currentCall.Interface} to {nextCall.Interface} is not allowed.");
+                        }
                         return false;
                     }
                 }
             }
         }
-
+        
         return true;
+    }
+
+    public bool DetectDeadlocks(CallHistory callHistory, bool throwOnViolation = false)
+    {
+        var graph = new Dictionary<GrainId, List<GrainId>>();
+
+        foreach (var call in callHistory.History)
+        {
+            if (call.SourceId.HasValue && call.TargetId.HasValue)
+            {
+                if (!graph.ContainsKey(call.SourceId.Value))
+                {
+                    graph[call.SourceId.Value] = new List<GrainId>();
+                }
+
+                graph[call.SourceId.Value].Add(call.TargetId.Value);
+            }
+        }
+
+        var visited = new HashSet<GrainId>();
+        var stack = new HashSet<GrainId>();
+
+        foreach (var node in graph.Keys)
+        {
+            if (IsCyclic(node, graph, visited, stack))
+            {
+                if(throwOnViolation)
+                {
+                    throw new InvalidOperationException($"Deadlock detected. GrainId: {node}");
+                }
+                
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool IsCyclic(GrainId node, Dictionary<GrainId, List<GrainId>> graph, HashSet<GrainId> visited, HashSet<GrainId> stack)
+    {
+        if (stack.Contains(node))
+        {
+            return true;
+        }
+
+        if (visited.Contains(node))
+        {
+            return false;
+        }
+
+        visited.Add(node);
+        stack.Add(node);
+
+        if (graph.ContainsKey(node))
+        {
+            foreach (var neighbor in graph[node])
+            {
+                if (IsCyclic(neighbor, graph, visited, stack))
+                {
+                    return true;
+                }
+            }
+        }
+
+        stack.Remove(node);
+        return false;
     }
 }

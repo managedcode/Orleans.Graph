@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
@@ -12,7 +13,7 @@ public static class RequestContextHelper
     {
         var call = context.GetCallHistory();
         //var caller = context.TargetContext!.GrainInstance!.GetType().Name;
-        call.Push(new InCall(context.InterfaceName, context.MethodName));
+        call.Push(new InCall(context.SourceId, context.TargetId, context.InterfaceName, context.MethodName));
         context.SetCallHistory(call);
         return true;
     }
@@ -23,10 +24,10 @@ public static class RequestContextHelper
             ? Constants.ClientCallerId
             : context.SourceContext!.GrainInstance!.GetType()
                 .GetInterfaces()
-                .FirstOrDefault(i => typeof(IGrain).IsAssignableFrom(i))?.FullName;
+                .FirstOrDefault(i => typeof(IGrain).IsAssignableFrom(i))?.FullName ?? string.Empty;
         
         var call = context.GetCallHistory();
-        call.Push(new OutCall(caller, context.InterfaceName, context.MethodName));
+        call.Push(new OutCall(context.SourceId, context.TargetId, caller, context.InterfaceName, context.MethodName));
         context.SetCallHistory(call);
         return true;
     }

@@ -1,11 +1,12 @@
 using Orleans;
+using Orleans.Runtime;
 
 namespace ManagedCode.Orleans.Graph.Models;
 
 [Immutable]
 [GenerateSerializer]
 [Alias("MC.InCall")]
-public class InCall(string type, string method) : Call(Direction.In, type, method)
+public class InCall(GrainId? sourceId, GrainId? targetId, string type, string method) : Call(sourceId, targetId, Direction.In, type, method)
 {
     public override string ToString()
     {
