@@ -5,7 +5,7 @@ using Xunit;
 
 namespace ManagedCode.Orleans.Graph.Tests;
 
-public class GrainGraphManagerTests
+public class GrainTransitionManagerTests
 {
 
 [Fact]

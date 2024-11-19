@@ -62,10 +62,10 @@ public class GrainCallsBuilder : IGrainCallsBuilder
         _graph.AddTransition(source, target, new GrainTransition("*", "*", IsReentrant: true));
     }
 
-    public GrainGraphManager Build()
+    public GrainTransitionManager Build()
     {
         ValidateCycles();
-        return new GrainGraphManager(_graph);
+        return new GrainTransitionManager(_graph);
     }
 
     private void ValidateCycles()

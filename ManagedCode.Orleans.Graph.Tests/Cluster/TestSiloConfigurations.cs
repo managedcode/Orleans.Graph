@@ -11,6 +11,9 @@ public class TestSiloConfigurations : ISiloConfigurator
         siloBuilder.AddOrleansGraph()
             .CreateGraph(graph =>
             {
+                graph.AddGrain<IGrainA>()
+                    .WithReentrancy();
+                
                 graph.AddGrainTransition<IGrainA, IGrainB>().AllMethods().WithReentrancy();
                 graph.AddGrainTransition<IGrainB, IGrainC>().AllMethods().WithReentrancy();
                 graph.AddGrainTransition<IGrainC, IGrainD>().AllMethods().WithReentrancy();

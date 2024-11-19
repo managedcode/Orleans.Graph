@@ -5,11 +5,11 @@ using ManagedCode.Orleans.Graph.Models;
 
 namespace ManagedCode.Orleans.Graph;
 
-public class GrainGraphManager
+public class GrainTransitionManager
 {
     private readonly DirectedGraph _grainGraph;
 
-    public GrainGraphManager(DirectedGraph grainGraph)
+    public GrainTransitionManager(DirectedGraph grainGraph)
     {
         _grainGraph = grainGraph ?? throw new ArgumentNullException(nameof(grainGraph));
     }
@@ -18,19 +18,27 @@ public class GrainGraphManager
     {
         if (callHistory.IsEmpty())
             return false;
-        
-        //TODO: check this code
+
         var calls = callHistory.History.Reverse().ToArray();
+        var visited = new HashSet<string>();
 
         for (var i = 0; i < calls.Length - 1; i++)
         {
             var currentCall = calls[i];
             var nextCall = calls[i + 1];
 
-            if (currentCall.Direction == Direction.Out && nextCall.Direction == Direction.In)
+            // Check for cycles
+            var transitionKey = $"{currentCall.Interface}->{nextCall.Interface}";
+            if (visited.Contains(transitionKey))
             {
-                if (!_grainGraph.IsTransitionAllowed(currentCall.Interface, nextCall.Interface, currentCall.Method, nextCall.Method))
-                    return false;
+                return false;
+            }
+            visited.Add(transitionKey);
+
+            // Check if the transition is allowed
+            if (!_grainGraph.IsTransitionAllowed(currentCall.Interface, nextCall.Interface, currentCall.Method, nextCall.Method))
+            {
+                return false;
             }
         }
 

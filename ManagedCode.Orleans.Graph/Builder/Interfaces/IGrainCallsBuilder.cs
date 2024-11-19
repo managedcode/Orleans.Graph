@@ -50,6 +50,6 @@ public interface IGrainCallsBuilder
     /// <summary>
     /// Builds the grain graph manager.
     /// </summary>
-    /// <returns>An instance of <see cref="GrainGraphManager"/>.</returns>
-    GrainGraphManager Build();
+    /// <returns>An instance of <see cref="GrainTransitionManager"/>.</returns>
+    GrainTransitionManager Build();
 }

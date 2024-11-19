@@ -9,7 +9,7 @@ namespace ManagedCode.Orleans.Graph.Filters;
 
 public class GraphOutgoingGrainCallFilter(IServiceProvider serviceProvider, GraphCallFilterConfig graphCallFilterConfig) : IOutgoingGrainCallFilter
 {
-    private GrainGraphManager? GraphManager => serviceProvider.GetService<GrainGraphManager>();
+    private GrainTransitionManager? GraphManager => serviceProvider.GetService<GrainTransitionManager>();
 
     public Task Invoke(IOutgoingGrainCallContext context)
     {

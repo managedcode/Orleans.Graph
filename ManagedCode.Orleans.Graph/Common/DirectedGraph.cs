@@ -92,6 +92,9 @@ public class DirectedGraph
             {
                 foreach (var neighbor in _adjacencyList[vertex].Keys)
                 {
+                    if (_allowSelfLoops && vertex.Equals(neighbor))
+                        continue;
+
                     if (!visited.Contains(neighbor) && IsCyclicUtil(neighbor, visited, recursionStack))
                         return true;
                     else if (recursionStack.Contains(neighbor))
