@@ -11,15 +11,8 @@ public interface IGrainCallsBuilder
     /// Specifies the starting grain type for the transition.
     /// </summary>
     /// <typeparam name="TGrain">The type of the grain.</typeparam>
-    /// <returns>An instance of <see cref="ITransitionBuilder"/>.</returns>
-    ITransitionBuilder From<TGrain>() where TGrain : IGrain;
-
-    /// <summary>
-    /// Groups grains under a specified name.
-    /// </summary>
-    /// <param name="name">The name of the group.</param>
-    /// <returns>An instance of <see cref="IGroupBuilder"/>.</returns>
-    IGroupBuilder Group(string name);
+    /// <returns>An instance of <see cref="ITransitionBuilder{TGrain}"/>.</returns>
+    ITransitionBuilder<TGrain> From<TGrain>() where TGrain : IGrain;
 
     /// <summary>
     /// Allows all grain calls.
@@ -32,13 +25,21 @@ public interface IGrainCallsBuilder
     /// </summary>
     /// <returns>The current instance of <see cref="IGrainCallsBuilder"/>.</returns>
     IGrainCallsBuilder DisallowAll();
-
+    
     /// <summary>
-    /// Adds a grain to the builder.
+    /// Adds a grain to the graph and allows defining method transitions for it.
     /// </summary>
     /// <typeparam name="TGrain">The type of the grain.</typeparam>
+    /// <returns>The current instance of <see cref="IMethodBuilder{TGrain, TGrain}"/> to define method transitions.</returns>
+    IMethodBuilder<TGrain, TGrain> AddGrain<TGrain>() where TGrain : IGrain;
+    
+    /// <summary>
+    /// Defines a transition between two grains in the graph.
+    /// </summary>
+    /// <typeparam name="TFrom">The type of the source grain.</typeparam>
+    /// <typeparam name="TTo">The type of the target grain.</typeparam>
     /// <returns>The current instance of <see cref="IGrainCallsBuilder"/>.</returns>
-    IGrainCallsBuilder AddGrain<TGrain>() where TGrain : IGrain;
+    IMethodBuilder<TFrom, TTo> AddGrainTransition<TFrom, TTo>() where TFrom : IGrain where TTo : IGrain;
 
     /// <summary>
     /// Adds a logical AND to the builder.

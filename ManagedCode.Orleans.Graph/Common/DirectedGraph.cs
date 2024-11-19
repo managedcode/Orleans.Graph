@@ -39,17 +39,17 @@ public class DirectedGraph
         {
             _adjacencyList[source][target] = new HashSet<GrainTransition>();
         }
-
+        
         _adjacencyList[source][target].Add(transition);
 
-        if (HasCycle())
+        if (!transition.IsReentrant && HasCycle())
         {
             _adjacencyList[source][target].Remove(transition);
             if (!_adjacencyList[source][target].Any())
             {
                 _adjacencyList[source].Remove(target);
             }
-            throw new InvalidOperationException($"Adding transition from {source} to {target} creates a cycle");
+            throw new InvalidOperationException($"Adding transition from {source} to {target} creates a cycle.");
         }
     }
 

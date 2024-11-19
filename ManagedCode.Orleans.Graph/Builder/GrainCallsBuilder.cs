@@ -1,13 +1,12 @@
 using System;
-using System.Collections.Generic;
 using ManagedCode.Orleans.Graph.Models;
 using Orleans;
 
 namespace ManagedCode.Orleans.Graph;
 
+[GrainGraphConfiguration]
 public class GrainCallsBuilder : IGrainCallsBuilder
 {
-    private readonly Dictionary<string, HashSet<string>> _groups = new();
     private readonly DirectedGraph _graph;
     private bool _allowAllByDefault;
 
@@ -16,21 +15,19 @@ public class GrainCallsBuilder : IGrainCallsBuilder
         _graph = new DirectedGraph(allowSelfLoops);
     }
 
-    public ITransitionBuilder From<TGrain>() where TGrain : IGrain
+    public ITransitionBuilder<TGrain> From<TGrain>() where TGrain : IGrain
     {
-        return new TransitionBuilder(this, typeof(TGrain).FullName);
+        return new TransitionBuilder<TGrain>(this, typeof(TGrain).FullName);
     }
 
-    public IGroupBuilder Group(string name)
+    public IMethodBuilder<TGrain, TGrain> AddGrain<TGrain>() where TGrain : IGrain
     {
-        _groups.TryAdd(name, new HashSet<string>());
-        return new GroupBuilder(this, name);
+        return From<TGrain>().To<TGrain>();
     }
 
-    public IGrainCallsBuilder AddGrain<TGrain>() where TGrain : IGrain
+    public IMethodBuilder<TFrom, TTo> AddGrainTransition<TFrom, TTo>() where TFrom : IGrain where TTo : IGrain
     {
-        _graph.AddVertex(typeof(TGrain).FullName);
-        return this;
+        return From<TFrom>().To<TTo>();
     }
 
     public IGrainCallsBuilder And()
@@ -49,10 +46,10 @@ public class GrainCallsBuilder : IGrainCallsBuilder
         _allowAllByDefault = false;
         return this;
     }
-
+    
     internal void AddTransition(string source, string target)
     {
-        _graph.AddTransition(source, target, new GrainTransition(string.Intern("*"), string.Intern("*")));
+        _graph.AddTransition(source, target, new GrainTransition("*", "*"));
     }
 
     internal void AddMethodRule(string source, string target, string sourceMethod, string targetMethod)
@@ -62,7 +59,7 @@ public class GrainCallsBuilder : IGrainCallsBuilder
 
     internal void AddReentrancy(string source, string target)
     {
-        _graph.AddTransition(source, target, new GrainTransition(string.Intern("*"), string.Intern("*"), IsReentrant: true));
+        _graph.AddTransition(source, target, new GrainTransition("*", "*", IsReentrant: true));
     }
 
     public GrainGraphManager Build()
@@ -75,9 +72,15 @@ public class GrainCallsBuilder : IGrainCallsBuilder
     {
         foreach (var edge in _graph.GetAllEdges())
         {
-            if (_graph.HasCycle())
+            foreach (var transition in edge.Transitions)
             {
-                throw new InvalidOperationException($"Cycle detected involving grain {edge.Source}");
+                if (transition.IsReentrant)
+                    continue;
+
+                if (_graph.HasCycle())
+                {
+                    throw new InvalidOperationException($"Cycle detected involving grain {edge.Source}");
+                }
             }
         }
     }

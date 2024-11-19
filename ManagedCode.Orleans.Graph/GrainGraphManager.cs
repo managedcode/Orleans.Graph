@@ -5,7 +5,6 @@ using ManagedCode.Orleans.Graph.Models;
 
 namespace ManagedCode.Orleans.Graph;
 
-[GrainGraphConfiguration]
 public class GrainGraphManager
 {
     private readonly DirectedGraph _grainGraph;
@@ -19,7 +18,7 @@ public class GrainGraphManager
     {
         if (callHistory.IsEmpty())
             return false;
-
+//TODO: check this code
         var calls = callHistory.History.Reverse().ToArray();
 
         for (var i = 0; i < calls.Length - 1; i++)

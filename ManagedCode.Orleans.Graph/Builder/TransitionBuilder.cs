@@ -3,7 +3,7 @@ using Orleans;
 
 namespace ManagedCode.Orleans.Graph;
 
-public class TransitionBuilder : ITransitionBuilder
+public class TransitionBuilder<TFrom> : ITransitionBuilder<TFrom> where TFrom : IGrain
 {
     private readonly GrainCallsBuilder _parent;
     private readonly string _sourceType;
@@ -14,9 +14,9 @@ public class TransitionBuilder : ITransitionBuilder
         _sourceType = sourceType;
     }
 
-    public IMethodBuilder To<TGrain>() where TGrain : IGrain
+    public IMethodBuilder<TFrom, TGrain> To<TGrain>() where TGrain : IGrain
     {
-        return new MethodBuilder(_parent, _sourceType, typeof(TGrain).FullName);
+        return new MethodBuilder<TFrom, TGrain>(_parent, _sourceType, typeof(TGrain).FullName);
     }
 
     public IGrainCallsBuilder And() => _parent;

@@ -11,12 +11,9 @@ public class TestSiloConfigurations : ISiloConfigurator
         siloBuilder.AddOrleansGraph()
             .CreateGraph(graph =>
             {
-                graph.AddGrain<IGrainA>();
-                
-                graph.From<IGrainA>()
-                    .To<IGrainB>()
-                    .AllMethods();
-                
+                graph.AddGrainTransition<IGrainA, IGrainB>().WithReentrancy().AllMethods();
+                graph.AddGrainTransition<IGrainB, IGrainC>().WithReentrancy().AllMethods();
+                graph.AddGrainTransition<IGrainC, IGrainD>().WithReentrancy().AllMethods();
             });
     }
 }

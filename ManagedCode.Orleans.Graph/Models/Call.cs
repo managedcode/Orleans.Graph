@@ -15,4 +15,9 @@ public class Call(Direction direction, string type, string method)
 
     [Id(2)]
     public string Method { get; set; } = method;
+    
+    public override string ToString()
+    {
+        return $"Direction: {Direction,-3} | Interface: {Interface,-20} | Method: {Method}";
+    }
 }

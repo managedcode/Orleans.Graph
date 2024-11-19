@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Orleans;
 
 namespace ManagedCode.Orleans.Graph.Models;
@@ -24,4 +25,11 @@ public class CallHistory
     {
         return History.Count == 0;
     }
+    
+    public override string ToString()
+    {
+        var transitions = string.Join("\n", History.Select(call => call.ToString()));
+        return $"CallHistory Id: {Id}\nTransitions:\n{transitions}";
+    }
+
 }

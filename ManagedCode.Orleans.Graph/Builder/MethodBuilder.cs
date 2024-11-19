@@ -4,7 +4,7 @@ using Orleans;
 
 namespace ManagedCode.Orleans.Graph;
 
-public class MethodBuilder : IMethodBuilder
+public class MethodBuilder<TSource, TTarget> : IMethodBuilder<TSource, TTarget> where TSource : IGrain where TTarget : IGrain
 {
     private readonly GrainCallsBuilder _parent;
     private readonly string _sourceType;
@@ -17,7 +17,7 @@ public class MethodBuilder : IMethodBuilder
         _targetType = targetType;
     }
 
-    public IMethodBuilder Method<TSource, TTarget>(Expression<Action<TSource>> source, Expression<Action<TTarget>> target) where TSource : IGrain where TTarget : IGrain
+    public IMethodBuilder<TSource, TTarget> Method(Expression<Action<TSource>> source, Expression<Action<TTarget>> target)
     {
         var sourceMethod = ExtractMethodName(source);
         var targetMethod = ExtractMethodName(target);
@@ -25,7 +25,7 @@ public class MethodBuilder : IMethodBuilder
         return this;
     }
 
-    public IMethodBuilder Methods<TSource, TTarget>(params (Expression<Action<TSource>> source, Expression<Action<TTarget>> target)[] methods) where TSource : IGrain where TTarget : IGrain
+    public IMethodBuilder<TSource, TTarget> Methods(params (Expression<Action<TSource>> source, Expression<Action<TTarget>> target)[] methods)
     {
         foreach (var (source, target) in methods)
         {
@@ -36,7 +36,7 @@ public class MethodBuilder : IMethodBuilder
         return this;
     }
 
-    public IMethodBuilder WithReentrancy()
+    public IMethodBuilder<TSource, TTarget> WithReentrancy()
     {
         _parent.AddReentrancy(_sourceType, _targetType);
         return this;
@@ -49,6 +49,39 @@ public class MethodBuilder : IMethodBuilder
     }
 
     public IGrainCallsBuilder And() => _parent;
+
+    public IMethodBuilder<TSource, TTarget> MethodByName(string sourceMethodName, string targetMethodName)
+    {
+        _parent.AddMethodRule(_sourceType, _targetType, sourceMethodName, targetMethodName);
+        return this;
+    }
+
+    public IMethodBuilder<TSource, TTarget> MethodsByName(params (string sourceMethodName, string targetMethodName)[] methods)
+    {
+        foreach (var (sourceMethodName, targetMethodName) in methods)
+        {
+            _parent.AddMethodRule(_sourceType, _targetType, sourceMethodName, targetMethodName);
+        }
+        return this;
+    }
+
+    public IMethodBuilder<TSource, TTarget> AllSourceMethodsToSpecificTargetMethods(params string[] targetMethods)
+    {
+        foreach (var targetMethod in targetMethods)
+        {
+            _parent.AddMethodRule(_sourceType, _targetType, "*", targetMethod);
+        }
+        return this;
+    }
+
+    public IMethodBuilder<TSource, TTarget> SpecificSourceMethodsToAllTargetMethods(params string[] sourceMethods)
+    {
+        foreach (var sourceMethod in sourceMethods)
+        {
+            _parent.AddMethodRule(_sourceType, _targetType, sourceMethod, "*");
+        }
+        return this;
+    }
 
     private string ExtractMethodName<T>(Expression<Action<T>> expression) where T : IGrain
     {

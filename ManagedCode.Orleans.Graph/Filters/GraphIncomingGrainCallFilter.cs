@@ -14,7 +14,12 @@ public class GraphIncomingGrainCallFilter(IServiceProvider serviceProvider, Grap
     public Task Invoke(IIncomingGrainCallContext context)
     {
         if (context.TrackIncomingCall(graphCallFilterConfig))
-            GraphManager?.IsTransitionAllowed(context.GetCallHistory());
+        {
+            if (GraphManager?.IsTransitionAllowed(context.GetCallHistory()) == false )
+            {
+                throw new InvalidOperationException("Transition is not allowed.\n" + context.GetCallHistory());
+            }
+        }
 
         return context.Invoke();
     }

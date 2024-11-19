@@ -8,6 +8,6 @@ namespace ManagedCode.Orleans.Graph.Models;
 public record GrainTransition(string SourceMethod, string TargetMethod, bool IsReentrant = false)
 {
     public bool MatchesMethods(string sourceMethod, string targetMethod) => 
-        (SourceMethod.Equals(string.Intern("*")) || SourceMethod == sourceMethod) && 
-        (TargetMethod.Equals(string.Intern("*")) || TargetMethod == targetMethod);
+        (SourceMethod.Equals("*") || SourceMethod == sourceMethod) && 
+        (TargetMethod.Equals("*") || TargetMethod == targetMethod);
 }
