@@ -42,10 +42,10 @@ public class MethodBuilder<TSource, TTarget> : IMethodBuilder<TSource, TTarget> 
         return this;
     }
 
-    public IGrainCallsBuilder AllMethods()
+    public IMethodBuilder<TSource, TTarget> AllMethods()
     {
         _parent.AddMethodRule(_sourceType, _targetType, "*", "*");
-        return _parent;
+        return this;
     }
 
     public IGrainCallsBuilder And() => _parent;

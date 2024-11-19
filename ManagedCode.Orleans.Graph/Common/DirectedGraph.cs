@@ -35,11 +35,17 @@ public class DirectedGraph
         AddVertex(source);
         AddVertex(target);
 
+        // Remove existing transitions between the same source and target
+        if (_adjacencyList[source].ContainsKey(target))
+        {
+            _adjacencyList[source][target].Clear();
+        }
+
         if (!_adjacencyList[source].ContainsKey(target))
         {
             _adjacencyList[source][target] = new HashSet<GrainTransition>();
         }
-        
+
         _adjacencyList[source][target].Add(transition);
 
         if (!transition.IsReentrant && HasCycle())

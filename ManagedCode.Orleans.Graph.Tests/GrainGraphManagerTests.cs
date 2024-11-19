@@ -15,6 +15,7 @@ public void IsTransitionAllowed_SingleValidTransition_ReturnsTrue()
         .From<IGrainA>()
         .To<IGrainB>()
         .AllMethods()
+        .And()
         .Build();
 
     var callHistory = new CallHistory();
@@ -48,6 +49,7 @@ public void IsTransitionAllowed_EmptyCallHistory_ReturnsFalse()
         .From<IGrainA>()
         .To<IGrainB>()
         .AllMethods()
+        .And()
         .Build();
 
     var callHistory = new CallHistory();
@@ -116,6 +118,7 @@ public void IsTransitionAllowed_DisallowedTransition_ReturnsFalse()
         .From<IGrainA>()
         .To<IGrainB>()
         .AllMethods()
+        .And()
         .Build();
 
     var callHistory = new CallHistory();
@@ -136,6 +139,7 @@ public void IsTransitionAllowed_MultipleValidTransitions_ReturnsTrue()
         .From<IGrainB>()
         .To<IGrainC>()
         .AllMethods()
+        .And()
         .Build();
 
     var callHistory = new CallHistory();
@@ -186,6 +190,7 @@ public void IsTransitionAllowed_DetectsComplexLoop_ThrowsExceptionOnBuild()
             .From<IGrainD>()
             .To<IGrainA>()
             .AllMethods()
+            .And()
             .Build();
     });
 
@@ -203,6 +208,7 @@ public void IsTransitionAllowed_DetectsSimpleLoop_ReturnsFalse()
         .From<IGrainB>()
         .To<IGrainC>()
         .AllMethods()
+        .And()
         .Build();
 
     var callHistory = new CallHistory();
@@ -227,6 +233,7 @@ public void IsTransitionAllowed_NoLoop_ReturnsTrue()
         .From<IGrainB>()
         .To<IGrainC>()
         .AllMethods()
+        .And()
         .Build();
 
     var callHistory = new CallHistory();

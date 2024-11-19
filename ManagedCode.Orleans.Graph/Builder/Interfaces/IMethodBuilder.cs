@@ -62,8 +62,8 @@ public interface IMethodBuilder<TSource, TTarget> where TSource : IGrain where T
     /// <summary>
     /// Specifies that all methods should be included.
     /// </summary>
-    /// <returns>An instance of <see cref="IGrainCallsBuilder"/>.</returns>
-    IGrainCallsBuilder AllMethods();
+    /// <returns>The current instance of <see cref="IMethodBuilder{TSource, TTarget}"/>.</returns>
+    IMethodBuilder<TSource, TTarget> AllMethods();
     
 
     /// <summary>
