@@ -64,6 +64,13 @@ public class MethodBuilder<TSource, TTarget> : IMethodBuilder<TSource, TTarget> 
         }
         return this;
     }
+    
+    public IMethodBuilder<TSource, TTarget> AllowClientCallGrain()
+    {
+        _parent.AllowClientCallGrain<TSource>();
+        _parent.AllowClientCallGrain<TTarget>();
+        return this;
+    }
 
     public IMethodBuilder<TSource, TTarget> AllSourceMethodsToSpecificTargetMethods(params string[] targetMethods)
     {

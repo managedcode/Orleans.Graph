@@ -1,3 +1,4 @@
+using FluentAssertions;
 using ManagedCode.Orleans.Graph.Tests.Cluster;
 using ManagedCode.Orleans.Graph.Tests.Cluster.Grains.Interfaces;
 using Xunit;
@@ -25,6 +26,32 @@ public class GraphTests
             .GetGrain<IGrainA>("1")
             .MethodA1(1);
     }
+    
+    [Fact]
+    public async Task GrainB_B1Test()
+    {
+        await _testApp.Cluster
+            .Client
+            .GetGrain<IGrainB>("1")
+            .MethodB1(1);
+    }
+    
+    [Fact]
+    public async Task GrainC_C1Test()
+    {
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        {
+            await _testApp.Cluster
+                .Client
+                .GetGrain<IGrainC>("1")
+                .MethodC1(1);
+        });
+
+        exception.Message
+            .Should()
+            .StartWith("Transition is not allowed.");
+    }
+    
 
     [Fact]
     public async Task GrainA_B1Test()

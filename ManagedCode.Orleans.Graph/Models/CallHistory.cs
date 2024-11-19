@@ -30,8 +30,8 @@ public class CallHistory
     
     public override string ToString()
     {
-        var transitions = string.Join("\n", History.Select(call => call.ToString()));
-        return $"CallHistory Id: {Id}\nTransitions:\n{transitions}";
+        var transitions = string.Join("\n", History.Reverse().Select(call => call.ToString()));
+        return $"CallHistory Id: {Id}\nTransitions:{transitions}\n";
     }
 
 }

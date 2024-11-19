@@ -9,4 +9,9 @@ public class OutCall(string caller, string type, string method) : Call(Direction
 {
     [Id(0)]
     public string Caller { get; set; } = caller;
+    
+    public override string ToString()
+    {
+        return $"\nCaller: {Caller}\nDirection: {Direction,-3} | Interface: {Interface,-20} | Method: {Method}";
+    }
 }

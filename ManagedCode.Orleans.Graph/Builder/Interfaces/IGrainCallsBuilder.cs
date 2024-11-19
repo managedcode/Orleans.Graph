@@ -13,6 +13,13 @@ public interface IGrainCallsBuilder
     /// <typeparam name="TGrain">The type of the grain.</typeparam>
     /// <returns>An instance of <see cref="ITransitionBuilder{TGrain}"/>.</returns>
     ITransitionBuilder<TGrain> From<TGrain>() where TGrain : IGrain;
+    
+    /// <summary>
+    /// Allows the client to call the specified grain.
+    /// </summary>
+    /// <typeparam name="TGrain">The type of the grain.</typeparam>
+    /// <returns>The current instance of <see cref="IGrainCallsBuilder"/>.</returns>
+    IGrainCallsBuilder AllowClientCallGrain<TGrain>() where TGrain : IGrain;
 
     /// <summary>
     /// Allows all grain calls.

@@ -12,7 +12,10 @@ public class TestSiloConfigurations : ISiloConfigurator
             .CreateGraph(graph =>
             {
                 graph.AddGrain<IGrainA>()
+                    .AllowClientCallGrain()
                     .WithReentrancy();
+
+                graph.AllowClientCallGrain<IGrainB>();
                 
                 graph.AddGrainTransition<IGrainA, IGrainB>().AllMethods().WithReentrancy();
                 graph.AddGrainTransition<IGrainB, IGrainC>().AllMethods().WithReentrancy();

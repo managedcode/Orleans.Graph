@@ -31,6 +31,12 @@ public interface IMethodBuilder<TSource, TTarget> where TSource : IGrain where T
     IMethodBuilder<TSource, TTarget> WithReentrancy();
     
     /// <summary>
+    /// Allows client calls to the grain.
+    /// </summary>
+    /// <returns>The current instance of <see cref="IMethodBuilder{TSource, TTarget}"/>.</returns>
+    IMethodBuilder<TSource, TTarget> AllowClientCallGrain();
+    
+    /// <summary>
     /// Specifies a method transition between two grains using method names.
     /// </summary>
     /// <param name="sourceMethodName">The source method name.</param>

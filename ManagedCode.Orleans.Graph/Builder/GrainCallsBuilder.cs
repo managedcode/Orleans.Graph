@@ -1,4 +1,5 @@
 using System;
+using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
 using Orleans;
 
@@ -14,10 +15,16 @@ public class GrainCallsBuilder : IGrainCallsBuilder
     {
         _graph = new DirectedGraph(allowSelfLoops);
     }
+    
+    public IGrainCallsBuilder AllowClientCallGrain<TGrain>() where TGrain : IGrain
+    {
+        AddTransition(Constants.ClientCallerId, typeof(TGrain).FullName!);
+        return this;
+    }
 
     public ITransitionBuilder<TGrain> From<TGrain>() where TGrain : IGrain
     {
-        return new TransitionBuilder<TGrain>(this, typeof(TGrain).FullName);
+        return new TransitionBuilder<TGrain>(this, typeof(TGrain).FullName!);
     }
 
     public IMethodBuilder<TGrain, TGrain> AddGrain<TGrain>() where TGrain : IGrain
