@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Orleans;
 
 namespace ManagedCode.Orleans.Graph.Models;
@@ -5,6 +6,7 @@ namespace ManagedCode.Orleans.Graph.Models;
 [Immutable]
 [GenerateSerializer]
 [Alias("MC.Call")]
+[DebuggerDisplay("{ToString()}")]
 public class Call(Direction direction, string type, string method)
 {
     [Id(0)]

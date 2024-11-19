@@ -1,3 +1,4 @@
+using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
 using ManagedCode.Orleans.Graph.Tests.Cluster.Grains.Interfaces;
 using Xunit;
@@ -81,7 +82,7 @@ public void IsTransitionAllowed_MethodRuleAllowed_ReturnsTrue()
     var graph = GrainCallsBuilder.Create()
         .From<IGrainA>()
         .To<IGrainB>()
-        .Method(a => a.MethodA1(0), b => b.MethodB1(0))
+        .Method(a => a.MethodA1(GraphParam.Any<int>()), b => b.MethodB1(GraphParam.Any<int>()))
         .And()
         .Build();
 
@@ -152,7 +153,7 @@ public void IsTransitionAllowed_InvalidMethodRule_ReturnsFalse()
     var graph = GrainCallsBuilder.Create()
         .From<IGrainA>()
         .To<IGrainB>()
-        .Method(a => a.MethodA1(0), b => b.MethodB1(0))
+        .Method(a => a.MethodA1(GraphParam.Any<int>()), b => b.MethodB1(GraphParam.Any<int>()))
         .And()
         .Build();
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using Orleans;
 
@@ -8,6 +9,7 @@ namespace ManagedCode.Orleans.Graph.Models;
 [Immutable]
 [GenerateSerializer]
 [Alias("MC.CallHistory")]
+[DebuggerDisplay("{ToString()}")]
 public class CallHistory
 {
     [Id(0)] public Guid Id = Guid.NewGuid();
