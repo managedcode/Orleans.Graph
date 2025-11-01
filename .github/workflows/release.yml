@@ -38,6 +38,9 @@ jobs:
     - name: Build
       run: dotnet build Orleans.Graph.slnx --configuration Release --no-restore
 
+    - name: Check code style
+      run: dotnet format Orleans.Graph.slnx --verify-no-changes
+
     - name: Test
       run: dotnet test Orleans.Graph.slnx --configuration Release --no-build --verbosity normal
 

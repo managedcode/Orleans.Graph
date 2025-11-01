@@ -2,8 +2,12 @@
 
     <!--C# version-->
     <PropertyGroup>
-        <TargetFramework>net8.0</TargetFramework>
-        <LangVersion>12</LangVersion>
+        <TargetFramework>net9.0</TargetFramework>
+        <LangVersion>13</LangVersion>
+        <EnableNETAnalyzers>true</EnableNETAnalyzers>
+        <Nullable>enable</Nullable>
+        <DebugType>embedded</DebugType>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
     </PropertyGroup>
 
     <!--NuGet-->
@@ -16,7 +20,7 @@
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
         <RepositoryType>Github</RepositoryType>
         <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
-<!--        <PackageIcon>logo.png</PackageIcon>-->
+        <PackageIcon>logo.png</PackageIcon>
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <EnablePackageValidation>true</EnablePackageValidation>
         <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -33,8 +37,12 @@
     </PropertyGroup>
 
     <ItemGroup>
-      <None Include="$(SolutionDir)\logo.png" Pack="true" Visible="false" PackagePath="\"/>
-      <None Include="$(SolutionDir)\README.md" Pack="true" Visible="false" PackagePath="\"/>
+        <None Include="..\logo.png" Pack="true" Visible="false" PackagePath="/">
+            <Link>logo.png</Link>
+        </None>
+        <None Include="..\README.md" Pack="true" Visible="false" PackagePath="/">
+            <Link>README.md</Link>
+        </None>
     </ItemGroup>
 
     <ItemGroup>
