@@ -16,7 +16,7 @@
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
         <RepositoryType>Github</RepositoryType>
         <AllowedOutputExtensionsInPackageBuildOutputFolder>$(AllowedOutputExtensionsInPackageBuildOutputFolder);.pdb</AllowedOutputExtensionsInPackageBuildOutputFolder>
-        <PackageIcon>logo.png</PackageIcon>
+<!--        <PackageIcon>logo.png</PackageIcon>-->
         <PackageLicenseExpression>MIT</PackageLicenseExpression>
         <EnablePackageValidation>true</EnablePackageValidation>
         <PackageReadmeFile>README.md</PackageReadmeFile>
