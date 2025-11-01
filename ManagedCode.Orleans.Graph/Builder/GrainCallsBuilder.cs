@@ -6,20 +6,22 @@ using Orleans;
 namespace ManagedCode.Orleans.Graph;
 
 [GrainGraphConfiguration]
-public class GrainCallsBuilder : IGrainCallsBuilder
+public class GrainCallsBuilder(bool allowSelfLoops = true) : IGrainCallsBuilder
 {
-    private readonly DirectedGraph _graph;
+    private readonly DirectedGraph _graph = new(allowSelfLoops);
     private bool _allowAllByDefault;
 
-    public GrainCallsBuilder(bool allowSelfLoops = true)
-    {
-        _graph = new DirectedGraph(allowSelfLoops);
-    }
-    
     public IGrainCallsBuilder AllowClientCallGrain<TGrain>() where TGrain : IGrain
     {
         AddTransition(Constants.ClientCallerId, typeof(TGrain).FullName!);
         return this;
+    }
+
+    internal void AllowClientCall(Type grainType)
+    {
+        ArgumentNullException.ThrowIfNull(grainType);
+
+        AddTransition(Constants.ClientCallerId, grainType.GetTypeName());
     }
 
     public ITransitionBuilder<TGrain> From<TGrain>() where TGrain : IGrain
@@ -53,7 +55,7 @@ public class GrainCallsBuilder : IGrainCallsBuilder
         _allowAllByDefault = false;
         return this;
     }
-    
+
     internal void AddTransition(string source, string target)
     {
         _graph.AddTransition(source, target, new GrainTransition("*", "*"));
@@ -72,7 +74,7 @@ public class GrainCallsBuilder : IGrainCallsBuilder
     public GrainTransitionManager Build()
     {
         ValidateCycles();
-        return new GrainTransitionManager(_graph);
+        return new GrainTransitionManager(_graph, _allowAllByDefault);
     }
 
     private void ValidateCycles()
@@ -82,7 +84,9 @@ public class GrainCallsBuilder : IGrainCallsBuilder
             foreach (var transition in edge.Transitions)
             {
                 if (transition.IsReentrant)
+                {
                     continue;
+                }
 
                 if (_graph.HasCycle())
                 {

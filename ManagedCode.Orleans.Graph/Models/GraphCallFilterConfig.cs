@@ -7,5 +7,6 @@ namespace ManagedCode.Orleans.Graph.Models;
 [Alias("MC.GraphCallFilterConfig")]
 public class GraphCallFilterConfig
 {
+    [Id(0)]
     public bool TrackOrleansCalls { get; set; } = false;
 }

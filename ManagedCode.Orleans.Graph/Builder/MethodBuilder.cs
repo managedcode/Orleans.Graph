@@ -4,18 +4,11 @@ using Orleans;
 
 namespace ManagedCode.Orleans.Graph;
 
-public class MethodBuilder<TSource, TTarget> : IMethodBuilder<TSource, TTarget> where TSource : IGrain where TTarget : IGrain
+public class MethodBuilder<TSource, TTarget>(GrainCallsBuilder parent, string sourceType, string targetType) : IMethodBuilder<TSource, TTarget> where TSource : IGrain where TTarget : IGrain
 {
-    private readonly GrainCallsBuilder _parent;
-    private readonly string _sourceType;
-    private readonly string _targetType;
-
-    public MethodBuilder(GrainCallsBuilder parent, string sourceType, string targetType)
-    {
-        _parent = parent;
-        _sourceType = sourceType;
-        _targetType = targetType;
-    }
+    private readonly GrainCallsBuilder _parent = parent;
+    private readonly string _sourceType = sourceType;
+    private readonly string _targetType = targetType;
 
     public IMethodBuilder<TSource, TTarget> Method(Expression<Action<TSource>> source, Expression<Action<TTarget>> target)
     {
@@ -64,7 +57,7 @@ public class MethodBuilder<TSource, TTarget> : IMethodBuilder<TSource, TTarget> 
         }
         return this;
     }
-    
+
     public IMethodBuilder<TSource, TTarget> AllowClientCallGrain()
     {
         _parent.AllowClientCallGrain<TSource>();
@@ -90,7 +83,7 @@ public class MethodBuilder<TSource, TTarget> : IMethodBuilder<TSource, TTarget> 
         return this;
     }
 
-    private string ExtractMethodName<T>(Expression<Action<T>> expression) where T : IGrain
+    private static string ExtractMethodName<T>(Expression<Action<T>> expression) where T : IGrain
     {
         return (expression.Body as MethodCallExpression)?.Method.Name
                ?? throw new ArgumentException("Expression must be a method call");

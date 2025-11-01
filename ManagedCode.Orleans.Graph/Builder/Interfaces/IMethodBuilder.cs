@@ -29,13 +29,13 @@ public interface IMethodBuilder<TSource, TTarget> where TSource : IGrain where T
     /// </summary>
     /// <returns>The current instance of <see cref="IMethodBuilder{TSource, TTarget}"/>.</returns>
     IMethodBuilder<TSource, TTarget> WithReentrancy();
-    
+
     /// <summary>
     /// Allows client calls to the grain.
     /// </summary>
     /// <returns>The current instance of <see cref="IMethodBuilder{TSource, TTarget}"/>.</returns>
     IMethodBuilder<TSource, TTarget> AllowClientCallGrain();
-    
+
     /// <summary>
     /// Specifies a method transition between two grains using method names.
     /// </summary>
@@ -70,7 +70,6 @@ public interface IMethodBuilder<TSource, TTarget> where TSource : IGrain where T
     /// </summary>
     /// <returns>The current instance of <see cref="IMethodBuilder{TSource, TTarget}"/>.</returns>
     IMethodBuilder<TSource, TTarget> AllMethods();
-    
 
     /// <summary>
     /// Adds a logical AND to the builder.

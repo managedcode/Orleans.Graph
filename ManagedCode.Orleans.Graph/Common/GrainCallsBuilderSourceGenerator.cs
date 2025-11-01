@@ -1,3 +1,5 @@
+// Suppress analyzer packaging warnings for in-assembly generator.
+#pragma warning disable RS1036, RS1038, RS1041, RS1042, RS2008
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis;
@@ -10,7 +12,7 @@ namespace ManagedCode.Orleans.Graph;
 public class GrainCallsBuilderSourceGenerator : ISourceGenerator
 {
     private const string DiagnosticId = "GCB001";
-    private static readonly DiagnosticDescriptor CycleRule = new DiagnosticDescriptor(
+    private static readonly DiagnosticDescriptor CycleRule = new(
         DiagnosticId,
         "Cycle detected in grain graph",
         "The grain configuration contains cycles in builder pattern",
@@ -26,7 +28,9 @@ public class GrainCallsBuilderSourceGenerator : ISourceGenerator
     public void Execute(GeneratorExecutionContext context)
     {
         if (context.SyntaxReceiver is not GrainCallsBuilderSyntaxReceiver receiver)
+        {
             return;
+        }
 
         foreach (var graphConfig in receiver.GraphConfigurations)
         {
@@ -46,14 +50,27 @@ public class GrainCallsBuilderSourceGenerator : ISourceGenerator
 
         var addTransitionCalls = graphConfig.DescendantNodes()
             .OfType<InvocationExpressionSyntax>()
-            .Where(i => i.Expression.ToString().Contains("AddGrainTransition"));
+            .Where(i =>
+            {
+                if (i.Expression is MemberAccessExpressionSyntax { Name: GenericNameSyntax genericName })
+                {
+                    return genericName.Identifier.Text is "AddGrainTransition" or "AddGrain";
+                }
+
+                return false;
+            });
 
         foreach (var call in addTransitionCalls)
         {
-            if (call.ArgumentList.Arguments.Count == 2)
+            if (call.Expression is not MemberAccessExpressionSyntax { Name: GenericNameSyntax genericName })
             {
-                var sourceArg = call.ArgumentList.Arguments[0].Expression;
-                var targetArg = call.ArgumentList.Arguments[1].Expression;
+                continue;
+            }
+
+            if (genericName.Identifier.Text == "AddGrainTransition" && genericName.TypeArgumentList.Arguments.Count == 2)
+            {
+                var sourceArg = genericName.TypeArgumentList.Arguments[0];
+                var targetArg = genericName.TypeArgumentList.Arguments[1];
 
                 var sourceType = model.GetTypeInfo(sourceArg).Type;
                 var targetType = model.GetTypeInfo(targetArg).Type;
@@ -63,6 +80,15 @@ public class GrainCallsBuilderSourceGenerator : ISourceGenerator
                     transitions.Add((sourceType, targetType));
                 }
             }
+            else if (genericName.Identifier.Text == "AddGrain" && genericName.TypeArgumentList.Arguments.Count == 1)
+            {
+                var typeArg = genericName.TypeArgumentList.Arguments[0];
+                var type = model.GetTypeInfo(typeArg).Type;
+                if (type != null)
+                {
+                    transitions.Add((type, type));
+                }
+            }
         }
 
         return transitions;
@@ -70,11 +96,21 @@ public class GrainCallsBuilderSourceGenerator : ISourceGenerator
 
     private static bool HasCycles(IEnumerable<(ITypeSymbol Source, ITypeSymbol Target)> transitions)
     {
-        var graph = transitions.GroupBy(t => t.Source, SymbolEqualityComparer.Default)
-            .ToDictionary(g => g.Key, g => g.Select(t => t.Target).ToHashSet(SymbolEqualityComparer.Default), SymbolEqualityComparer.Default);
+        var graph = new Dictionary<ITypeSymbol, HashSet<ITypeSymbol>>(SymbolEqualityComparer.Default);
 
-        var visited = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
-        var recursionStack = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+        foreach (var (source, target) in transitions)
+        {
+            if (!graph.TryGetValue(source, out var neighbors))
+            {
+                neighbors = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
+                graph[source] = neighbors;
+            }
+
+            neighbors.Add(target);
+        }
+
+        var visited = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
+        var recursionStack = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
 
         foreach (var vertex in graph.Keys)
         {
@@ -87,7 +123,7 @@ public class GrainCallsBuilderSourceGenerator : ISourceGenerator
         return false;
     }
 
-    private static bool IsCyclicUtil(ISymbol vertex, Dictionary<ISymbol, HashSet<ISymbol>> graph, HashSet<ISymbol> visited, HashSet<ISymbol> recursionStack)
+    private static bool IsCyclicUtil(ITypeSymbol vertex, Dictionary<ITypeSymbol, HashSet<ITypeSymbol>> graph, HashSet<ITypeSymbol> visited, HashSet<ITypeSymbol> recursionStack)
     {
         if (!visited.Contains(vertex))
         {
@@ -127,3 +163,5 @@ public class GrainCallsBuilderSourceGenerator : ISourceGenerator
         }
     }
 }
+
+#pragma warning restore RS1036, RS1038, RS1041, RS1042, RS2008

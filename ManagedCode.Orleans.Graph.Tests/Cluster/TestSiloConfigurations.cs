@@ -8,18 +8,17 @@ public class TestSiloConfigurations : ISiloConfigurator
 {
     public void Configure(ISiloBuilder siloBuilder)
     {
-        siloBuilder.AddOrleansGraph()
-            .CreateGraph(graph =>
-            {
-                graph.AddGrain<IGrainA>()
-                    .AllowClientCallGrain()
-                    .WithReentrancy();
+        siloBuilder.AddOrleansGraph(configureGraph: graph =>
+        {
+            graph.AddGrain<IGrainA>()
+                .AllowClientCallGrain()
+                .WithReentrancy();
 
-                graph.AllowClientCallGrain<IGrainB>();
-                
-                graph.AddGrainTransition<IGrainA, IGrainB>().AllMethods().WithReentrancy();
-                graph.AddGrainTransition<IGrainB, IGrainC>().AllMethods().WithReentrancy();
-                graph.AddGrainTransition<IGrainC, IGrainD>().AllMethods().WithReentrancy();
-            });
+            graph.AllowClientCallGrain<IGrainB>();
+
+            graph.AddGrainTransition<IGrainA, IGrainB>().AllMethods().WithReentrancy();
+            graph.AddGrainTransition<IGrainB, IGrainC>().AllMethods().WithReentrancy();
+            graph.AddGrainTransition<IGrainC, IGrainD>().AllMethods().WithReentrancy();
+        });
     }
 }

@@ -17,7 +17,6 @@ public class CallHistory
     [Id(1)]
     public Stack<Call> History { get; } = new();
 
-
     public void Push(Call call)
     {
         History.Push(call);
@@ -27,7 +26,7 @@ public class CallHistory
     {
         return History.Count == 0;
     }
-    
+
     public override string ToString()
     {
         var transitions = string.Join("\n", History.Reverse().Select(call => call.ToString()));

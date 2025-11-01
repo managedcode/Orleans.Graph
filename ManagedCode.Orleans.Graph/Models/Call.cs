@@ -18,15 +18,12 @@ public class Call(GrainId? sourceId, GrainId? targetId, Direction direction, str
 
     [Id(2)]
     public string Method { get; set; } = method;
-    
+
     [Id(3)]
     public GrainId? SourceId { get; set; } = sourceId;
-    
-    [Id(5)]
+
+    [Id(4)]
     public GrainId? TargetId { get; set; } = targetId;
-    
-    public override string ToString()
-    {
-        return $"Direction: {Direction,-3} | Interface: {Interface,-20} | Method: {Method}";
-    }
+
+    public override string ToString() => $"Direction: {Direction,-3} | Interface: {Interface,-20} | Method: {Method}";
 }

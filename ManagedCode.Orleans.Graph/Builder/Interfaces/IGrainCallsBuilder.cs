@@ -13,7 +13,7 @@ public interface IGrainCallsBuilder
     /// <typeparam name="TGrain">The type of the grain.</typeparam>
     /// <returns>An instance of <see cref="ITransitionBuilder{TGrain}"/>.</returns>
     ITransitionBuilder<TGrain> From<TGrain>() where TGrain : IGrain;
-    
+
     /// <summary>
     /// Allows the client to call the specified grain.
     /// </summary>
@@ -32,14 +32,14 @@ public interface IGrainCallsBuilder
     /// </summary>
     /// <returns>The current instance of <see cref="IGrainCallsBuilder"/>.</returns>
     IGrainCallsBuilder DisallowAll();
-    
+
     /// <summary>
     /// Adds a grain to the graph and allows defining method transitions for it.
     /// </summary>
     /// <typeparam name="TGrain">The type of the grain.</typeparam>
     /// <returns>The current instance of <see cref="IMethodBuilder{TGrain, TGrain}"/> to define method transitions.</returns>
     IMethodBuilder<TGrain, TGrain> AddGrain<TGrain>() where TGrain : IGrain;
-    
+
     /// <summary>
     /// Defines a transition between two grains in the graph.
     /// </summary>

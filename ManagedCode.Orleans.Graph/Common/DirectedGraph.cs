@@ -1,22 +1,15 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using ManagedCode.Orleans.Graph.Models;
 
 namespace ManagedCode.Orleans.Graph;
 
-public class DirectedGraph
+public class DirectedGraph(bool allowSelfLoops = false)
 {
-    private readonly Dictionary<string, Dictionary<string, HashSet<GrainTransition>>> _adjacencyList;
-    private readonly HashSet<string> _vertices;
-    private readonly bool _allowSelfLoops;
-
-    public DirectedGraph(bool allowSelfLoops = false)
-    {
-        _allowSelfLoops = allowSelfLoops;
-        _adjacencyList = new Dictionary<string, Dictionary<string, HashSet<GrainTransition>>>();
-        _vertices = new HashSet<string>();
-    }
+    private readonly Dictionary<string, Dictionary<string, HashSet<GrainTransition>>> _adjacencyList = new();
+    private readonly HashSet<string> _vertices = new();
+    private readonly bool _allowSelfLoops = allowSelfLoops;
 
     public void AddVertex(string vertex)
     {
@@ -30,27 +23,24 @@ public class DirectedGraph
     public void AddTransition(string source, string target, GrainTransition transition)
     {
         if (!_allowSelfLoops && source.Equals(target))
+        {
             return;
+        }
 
         AddVertex(source);
         AddVertex(target);
 
-        // Remove existing transitions between the same source and target
-        if (_adjacencyList[source].ContainsKey(target))
+        if (!_adjacencyList[source].TryGetValue(target, out var transitions))
         {
-            _adjacencyList[source][target].Clear();
+            transitions = new HashSet<GrainTransition>();
+            _adjacencyList[source][target] = transitions;
         }
 
-        if (!_adjacencyList[source].ContainsKey(target))
-        {
-            _adjacencyList[source][target] = new HashSet<GrainTransition>();
-        }
-
-        _adjacencyList[source][target].Add(transition);
+        transitions.Add(transition);
 
         if (!transition.IsReentrant && HasCycle())
         {
-            _adjacencyList[source][target].Remove(transition);
+            transitions.Remove(transition);
             if (!_adjacencyList[source][target].Any())
             {
                 _adjacencyList[source].Remove(target);
@@ -61,11 +51,12 @@ public class DirectedGraph
 
     public bool IsTransitionAllowed(string source, string target, string sourceMethod, string targetMethod)
     {
-        if (!_adjacencyList.ContainsKey(source) || !_adjacencyList[source].ContainsKey(target))
+        if (!_adjacencyList.TryGetValue(source, out var targets) || !targets.TryGetValue(target, out var transitions))
+        {
             return false;
+        }
 
-        return _adjacencyList[source][target]
-            .Any(t => t.MatchesMethods(sourceMethod, targetMethod));
+        return transitions.Any(t => t.MatchesMethods(sourceMethod, targetMethod));
     }
 
     public bool HasCycle()
@@ -76,7 +67,9 @@ public class DirectedGraph
         foreach (var vertex in _vertices)
         {
             if (IsCyclicUtil(vertex, visited, recursionStack))
+            {
                 return true;
+            }
         }
         return false;
     }
@@ -88,17 +81,23 @@ public class DirectedGraph
             visited.Add(vertex);
             recursionStack.Add(vertex);
 
-            if (_adjacencyList.ContainsKey(vertex))
+            if (_adjacencyList.TryGetValue(vertex, out var value))
             {
-                foreach (var neighbor in _adjacencyList[vertex].Keys)
+                foreach (var neighbor in value.Keys)
                 {
                     if (_allowSelfLoops && vertex.Equals(neighbor))
+                    {
                         continue;
+                    }
 
                     if (!visited.Contains(neighbor) && IsCyclicUtil(neighbor, visited, recursionStack))
+                    {
                         return true;
+                    }
                     else if (recursionStack.Contains(neighbor))
+                    {
                         return true;
+                    }
                 }
             }
         }
@@ -119,11 +118,26 @@ public class DirectedGraph
 
     public bool HasVertex(string vertex) => _vertices.Contains(vertex);
 
-    public bool HasEdge(string source, string target) => 
+    public bool HasEdge(string source, string target) =>
         _adjacencyList.ContainsKey(source) && _adjacencyList[source].ContainsKey(target);
+
+    public bool HasReentrantTransition(string source, string target)
+    {
+        if (!_adjacencyList.TryGetValue(source, out var targets))
+        {
+            return false;
+        }
+
+        if (!targets.TryGetValue(target, out var transitions))
+        {
+            return false;
+        }
+
+        return transitions.Any(static transition => transition.IsReentrant);
+    }
 
     public IEnumerable<string> GetVertices() => _vertices;
 
     public IEnumerable<string> GetNeighbors(string vertex) =>
-        _adjacencyList.ContainsKey(vertex) ? _adjacencyList[vertex].Keys : Enumerable.Empty<string>();
+        _adjacencyList.TryGetValue(vertex, out var value) ? value.Keys : Enumerable.Empty<string>();
 }

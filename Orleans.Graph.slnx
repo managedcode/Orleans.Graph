@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="ManagedCode.Orleans.Graph.Tests/ManagedCode.Orleans.Graph.Tests.csproj" />
+  <Project Path="ManagedCode.Orleans.Graph/ManagedCode.Orleans.Graph.csproj" />
+</Solution>

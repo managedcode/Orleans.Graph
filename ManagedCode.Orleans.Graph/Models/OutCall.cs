@@ -10,9 +10,6 @@ public class OutCall(GrainId? sourceId, GrainId? targetId, string caller, string
 {
     [Id(0)]
     public string Caller { get; set; } = caller;
-    
-    public override string ToString()
-    {
-        return $"\nCaller: {Caller}\nDirection: {Direction,-3} | Interface: {Interface,-20} | Method: {Method}";
-    }
+
+    public override string ToString() => $"\nCaller: {Caller}\nDirection: {Direction,-3} | Interface: {Interface,-20} | Method: {Method}";
 }

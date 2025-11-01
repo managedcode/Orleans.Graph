@@ -6,7 +6,7 @@ public static class GraphParam
     {
         return default(T)!;
     }
-    
+
     // public static dynamic Any()
     // {
     //     return default;

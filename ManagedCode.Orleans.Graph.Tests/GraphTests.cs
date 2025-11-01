@@ -1,4 +1,3 @@
-using FluentAssertions;
 using ManagedCode.Orleans.Graph.Tests.Cluster;
 using ManagedCode.Orleans.Graph.Tests.Cluster.Grains.Interfaces;
 using Xunit;
@@ -7,17 +6,10 @@ using Xunit.Abstractions;
 namespace ManagedCode.Orleans.Graph.Tests;
 
 [Collection(nameof(TestClusterApplication))]
-public class GraphTests
+public class GraphTests(TestClusterApplication testApp, ITestOutputHelper outputHelper)
 {
-    private readonly ITestOutputHelper _outputHelper;
-    private readonly TestClusterApplication _testApp;
+    private readonly TestClusterApplication _testApp = testApp;
 
-    public GraphTests(TestClusterApplication testApp, ITestOutputHelper outputHelper)
-    {
-        _testApp = testApp;
-        _outputHelper = outputHelper;
-    }
-    
     [Fact]
     public async Task GrainA_A1Test()
     {
@@ -26,7 +18,7 @@ public class GraphTests
             .GetGrain<IGrainA>("1")
             .MethodA1(1);
     }
-    
+
     [Fact]
     public async Task GrainB_B1Test()
     {
@@ -35,7 +27,7 @@ public class GraphTests
             .GetGrain<IGrainB>("1")
             .MethodB1(1);
     }
-    
+
     [Fact]
     public async Task GrainC_C1Test()
     {
@@ -47,11 +39,10 @@ public class GraphTests
                 .MethodC1(1);
         });
 
-        exception.Message
-            .Should()
-            .StartWith("Transition from ORLEANS_GRAIN_CLIENT to ManagedCode.Orleans.Graph.Tests.Cluster.Grains.Interfaces.IGrainC is not allowed.");
+        Assert.StartsWith(
+            "Transition from ORLEANS_GRAIN_CLIENT to ManagedCode.Orleans.Graph.Tests.Cluster.Grains.Interfaces.IGrainC is not allowed.",
+            exception.Message);
     }
-    
 
     [Fact]
     public async Task GrainA_B1Test()
@@ -74,7 +65,7 @@ public class GraphTests
             .Client
             .GetGrain<IGrainA>("1")
             .MethodB1(1);
-        
+
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
         {
             await _testApp.Cluster
@@ -83,9 +74,7 @@ public class GraphTests
                 .MethodC1(1);
         });
 
-        exception.Message
-            .Should()
-            .StartWith("Transition from");
+        Assert.StartsWith("Transition from", exception.Message);
     }
 
     [Fact]
@@ -99,8 +88,6 @@ public class GraphTests
                 .MethodB2(1);
         });
 
-        exception.Message
-            .Should()
-            .StartWith("Deadlock detected.");
+        Assert.StartsWith("Deadlock detected.", exception.Message);
     }
 }
