@@ -44,6 +44,9 @@ jobs:
     - name: Test
       run: dotnet test --solution Orleans.Graph.slnx --configuration Release --no-build --verbosity normal --report-trx --results-directory ./artifacts/test-results
 
+    - name: Build coverage binaries
+      run: dotnet build ManagedCode.Orleans.Graph.Tests/ManagedCode.Orleans.Graph.Tests.csproj --configuration Release --no-restore -p:ContinuousIntegrationBuild=false
+
     - name: Collect coverage
       run: dotnet tool run coverlet ManagedCode.Orleans.Graph.Tests/bin/Release/net10.0/ManagedCode.Orleans.Graph.Tests.dll --target "dotnet" --targetargs "test --project ManagedCode.Orleans.Graph.Tests/ManagedCode.Orleans.Graph.Tests.csproj --configuration Release --no-build --no-restore" --format cobertura --output artifacts/coverage/coverage.cobertura.xml --exclude "[ManagedCode.Orleans.Graph.Tests]*" --threshold 80 --threshold-type line --threshold-stat total
 
