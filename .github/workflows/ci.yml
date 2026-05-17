@@ -7,11 +7,14 @@ on:
     branches: [ main ]
 
 env:
-  DOTNET_VERSION: '9.0.x'
+  DOTNET_VERSION: '10.0.x'
+
+permissions:
+  contents: read
 
 jobs:
-  build:
-    name: Build and Test
+  build-and-test:
+    name: Build, Test, and Coverage
     runs-on: ubuntu-latest
 
     steps:
@@ -23,11 +26,51 @@ jobs:
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
-    - name: Restore dependencies
+    - name: Restore local tools
+      run: dotnet tool restore
+
+    - name: Restore
       run: dotnet restore Orleans.Graph.slnx
 
     - name: Build
       run: dotnet build Orleans.Graph.slnx --configuration Release --no-restore
 
+    - name: Analyze
+      run: dotnet build Orleans.Graph.slnx --configuration Release --no-restore -p:RunAnalyzers=true
+
+    - name: Verify formatting
+      run: dotnet format Orleans.Graph.slnx --verify-no-changes
+
     - name: Test
-      run: dotnet test Orleans.Graph.slnx --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage"
+      run: dotnet test --solution Orleans.Graph.slnx --configuration Release --no-build --verbosity normal --report-trx --results-directory ./artifacts/test-results
+
+    - name: Collect coverage
+      run: dotnet tool run coverlet ManagedCode.Orleans.Graph.Tests/bin/Release/net10.0/ManagedCode.Orleans.Graph.Tests.dll --target "dotnet" --targetargs "test --project ManagedCode.Orleans.Graph.Tests/ManagedCode.Orleans.Graph.Tests.csproj --configuration Release --no-build --no-restore" --format cobertura --output artifacts/coverage/coverage.cobertura.xml --exclude "[ManagedCode.Orleans.Graph.Tests]*" --threshold 80 --threshold-type line --threshold-stat total
+
+    - name: Render coverage report
+      run: dotnet tool run reportgenerator -reports:"artifacts/coverage/coverage.cobertura.xml" -targetdir:"artifacts/coverage-report" -reporttypes:"HtmlSummary;MarkdownSummaryGithub"
+
+    - name: Upload test artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: ./artifacts/test-results/**
+        retention-days: 5
+
+    - name: Upload coverage artifacts
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: |
+          ./artifacts/coverage/**
+          ./artifacts/coverage-report/**
+        retention-days: 5
+
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v5
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+        files: ./artifacts/coverage/coverage.cobertura.xml
+        fail_ci_if_error: false

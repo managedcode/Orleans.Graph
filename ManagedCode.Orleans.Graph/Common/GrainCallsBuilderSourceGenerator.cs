@@ -1,7 +1,5 @@
 // Suppress analyzer packaging warnings for in-assembly generator.
 #pragma warning disable RS1036, RS1038, RS1041, RS1042, RS2008
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -12,7 +10,7 @@ namespace ManagedCode.Orleans.Graph;
 public class GrainCallsBuilderSourceGenerator : ISourceGenerator
 {
     private const string DiagnosticId = "GCB001";
-    private static readonly DiagnosticDescriptor CycleRule = new(
+    private static readonly DiagnosticDescriptor _cycleRule = new(
         DiagnosticId,
         "Cycle detected in grain graph",
         "The grain configuration contains cycles in builder pattern",
@@ -39,7 +37,7 @@ public class GrainCallsBuilderSourceGenerator : ISourceGenerator
 
             if (HasCycles(transitions))
             {
-                context.ReportDiagnostic(Diagnostic.Create(CycleRule, graphConfig.GetLocation()));
+                context.ReportDiagnostic(Diagnostic.Create(_cycleRule, graphConfig.GetLocation()));
             }
         }
     }
@@ -127,7 +125,7 @@ public class GrainCallsBuilderSourceGenerator : ISourceGenerator
     {
         if (!visited.Contains(vertex))
         {
-            visited.Add(vertex);
+            _ = visited.Add(vertex);
             recursionStack.Add(vertex);
 
             if (graph.TryGetValue(vertex, out var neighbors))

@@ -1,9 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Text;
 using ManagedCode.Orleans.Graph.Models;
-using Orleans.Runtime;
 
 namespace ManagedCode.Orleans.Graph;
 
@@ -109,6 +105,22 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
     public string GeneratePolicyMermaidDiagram()
     {
         return GenerateMermaidDiagramInternal(new HashSet<(string Source, string Target)>(), null);
+    }
+
+    public IReadOnlyCollection<GrainTransitionEdge> GetPolicyEdges()
+    {
+        return _grainGraph.GetAllEdges()
+            .OrderBy(static edge => edge.Source, StringComparer.Ordinal)
+            .ThenBy(static edge => edge.Target, StringComparer.Ordinal)
+            .Select(static edge => new GrainTransitionEdge(
+                edge.Source,
+                edge.Target,
+                edge.Transitions
+                    .OrderBy(static transition => transition.SourceMethod, StringComparer.Ordinal)
+                    .ThenBy(static transition => transition.TargetMethod, StringComparer.Ordinal)
+                    .ThenBy(static transition => transition.IsReentrant)
+                    .ToArray()))
+            .ToArray();
     }
 
     public string GenerateLiveMermaidDiagram(CallHistory callHistory)

@@ -1,59 +1,58 @@
 using ManagedCode.Orleans.Graph.Models;
 using ManagedCode.Orleans.Graph.Tests.AttributeCluster;
 using Microsoft.Extensions.DependencyInjection;
-using Xunit;
 
 namespace ManagedCode.Orleans.Graph.Tests;
 
-[Collection(nameof(TestAttributeClusterApplication))]
+[ClassDataSource<TestAttributeClusterApplication>(Shared = SharedType.PerTestSession)]
 public class AttributeClusterTests(TestAttributeClusterApplication fixture)
 {
     private readonly TestAttributeClusterApplication _fixture = fixture;
 
-    [Fact]
-    public async Task AttributeGraph_AllowsConfiguredTransitions()
+    [Test]
+    public async Task AttributeGraph_AllowsConfiguredTransitionsAsync()
     {
         var result = await _fixture.Cluster.Client
             .GetGrain<IAttributeClusterGrainA>("1")
             .CallB();
 
-        Assert.Equal(1, result);
+        result.ShouldBe(1);
     }
 
-    [Fact]
-    public async Task AttributeGraph_DisallowsMissingTransition()
+    [Test]
+    public async Task AttributeGraph_DisallowsMissingTransitionAsync()
     {
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        var exception = await Should.ThrowAsync<InvalidOperationException>(async () =>
         {
             await _fixture.Cluster.Client
                 .GetGrain<IAttributeClusterGrainA>("1")
                 .CallC();
         });
 
-        Assert.StartsWith("Transition from", exception.Message);
+        exception.Message.ShouldStartWith("Transition from");
     }
 
-    [Fact]
-    public async Task AttributeGraph_AllowsReentrancy()
+    [Test]
+    public async Task AttributeGraph_AllowsReentrancyAsync()
     {
         var result = await _fixture.Cluster.Client
             .GetGrain<IAttributeClusterGrainB>("1")
             .ReentrantCall();
 
-        Assert.Equal(1, result);
+        result.ShouldBe(1);
     }
 
-    [Fact]
+    [Test]
     public void AttributeGraph_ProducesExpectedPolicyDiagram()
     {
         var manager = _fixture.Cluster.Client.ServiceProvider.GetRequiredService<GrainTransitionManager>();
         var diagram = manager.GeneratePolicyMermaidDiagram();
 
-        Assert.Contains("IAttributeClusterGrainA", diagram);
-        Assert.Contains("IAttributeClusterGrainB", diagram);
+        diagram.ShouldContain("IAttributeClusterGrainA");
+        diagram.ShouldContain("IAttributeClusterGrainB");
     }
 
-    [Fact]
+    [Test]
     public void AttributeGraph_LiveDiagramHighlightsUsage()
     {
         var manager = _fixture.Cluster.Client.ServiceProvider.GetRequiredService<GrainTransitionManager>();
@@ -64,7 +63,7 @@ public class AttributeClusterTests(TestAttributeClusterApplication fixture)
 
         var diagram = manager.GenerateLiveMermaidDiagram(history);
 
-        Assert.Contains("==>", diagram);
-        Assert.Contains("hits: 1", diagram);
+        diagram.ShouldContain("==>");
+        diagram.ShouldContain("hits: 1");
     }
 }

@@ -1,13 +1,12 @@
 using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
 using ManagedCode.Orleans.Graph.Tests.Attributes;
-using Xunit;
 
 namespace ManagedCode.Orleans.Graph.Tests;
 
 public class AttributeGraphConfiguratorTests
 {
-    [Fact]
+    [Test]
     public void AttributeConfigurator_BuildsExpectedGraph()
     {
         var builder = new GrainCallsBuilder();
@@ -19,16 +18,16 @@ public class AttributeGraphConfiguratorTests
         clientHistory.Push(new InCall(null, null, typeof(IAttributeGrainA).FullName!, nameof(IAttributeGrainA.MethodA1)));
         clientHistory.Push(new OutCall(null, null, Constants.ClientCallerId, typeof(IAttributeGrainA).FullName!, nameof(IAttributeGrainA.MethodA1)));
 
-        Assert.True(manager.IsTransitionAllowed(clientHistory));
+        manager.IsTransitionAllowed(clientHistory).ShouldBeTrue();
 
         var reentrantHistory = new CallHistory();
         reentrantHistory.Push(new OutCall(null, null, typeof(IAttributeGrainB).FullName!, typeof(IAttributeGrainB).FullName!, nameof(IAttributeGrainB.MethodB1)));
         reentrantHistory.Push(new InCall(null, null, typeof(IAttributeGrainB).FullName!, nameof(IAttributeGrainB.MethodB1)));
 
-        Assert.True(manager.IsTransitionAllowed(reentrantHistory));
+        manager.IsTransitionAllowed(reentrantHistory).ShouldBeTrue();
     }
 
-    [Fact]
+    [Test]
     public void AttributeConfigurator_ScansAllAssemblies_WhenAssembliesNotSpecified()
     {
         var builder = new GrainCallsBuilder();
@@ -40,10 +39,10 @@ public class AttributeGraphConfiguratorTests
         callHistory.Push(new Call(null, null, Direction.Out, typeof(IAttributeGrainA).FullName!, nameof(IAttributeGrainA.MethodA1)));
         callHistory.Push(new Call(null, null, Direction.In, typeof(IAttributeGrainB).FullName!, nameof(IAttributeGrainB.MethodB1)));
 
-        Assert.True(manager.IsTransitionAllowed(callHistory));
+        manager.IsTransitionAllowed(callHistory).ShouldBeTrue();
     }
 
-    [Fact]
+    [Test]
     public void AttributeConfigurator_RespectsMethodPairs()
     {
         var builder = new GrainCallsBuilder();
@@ -55,16 +54,16 @@ public class AttributeGraphConfiguratorTests
         allowed.Push(new Call(null, null, Direction.Out, typeof(IAttributeGrainC).FullName!, nameof(IAttributeGrainC.MethodSpecial)));
         allowed.Push(new Call(null, null, Direction.In, typeof(IAttributeGrainB).FullName!, nameof(IAttributeGrainB.MethodB1)));
 
-        Assert.True(manager.IsTransitionAllowed(allowed));
+        manager.IsTransitionAllowed(allowed).ShouldBeTrue();
 
         var rejected = new CallHistory();
         rejected.Push(new Call(null, null, Direction.Out, typeof(IAttributeGrainC).FullName!, nameof(IAttributeGrainC.MethodOther)));
         rejected.Push(new Call(null, null, Direction.In, typeof(IAttributeGrainB).FullName!, nameof(IAttributeGrainB.MethodB1)));
 
-        Assert.False(manager.IsTransitionAllowed(rejected));
+        manager.IsTransitionAllowed(rejected).ShouldBeFalse();
     }
 
-    [Fact]
+    [Test]
     public void AttributeConfigurator_ClientAttributeWithTargetType_AllowsClientCalls()
     {
         var builder = new GrainCallsBuilder();
@@ -76,6 +75,6 @@ public class AttributeGraphConfiguratorTests
         history.Push(new InCall(null, null, typeof(IAttributeGrainB).FullName!, nameof(IAttributeGrainB.MethodB1)));
         history.Push(new OutCall(null, null, Constants.ClientCallerId, typeof(IAttributeGrainB).FullName!, nameof(IAttributeGrainB.MethodB1)));
 
-        Assert.True(manager.IsTransitionAllowed(history));
+        manager.IsTransitionAllowed(history).ShouldBeTrue();
     }
 }

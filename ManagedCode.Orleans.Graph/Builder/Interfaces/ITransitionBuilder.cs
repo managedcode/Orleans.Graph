@@ -1,7 +1,6 @@
-using Orleans;
-
 namespace ManagedCode.Orleans.Graph;
 
+#pragma warning disable CA1716 // Fluent DSL intentionally uses To/And for readable chaining.
 /// <summary>
 /// Interface for building transitions between grains in an Orleans graph.
 /// </summary>
@@ -20,3 +19,4 @@ public interface ITransitionBuilder<TFrom> where TFrom : IGrain
     /// <returns>An instance of <see cref="IGrainCallsBuilder"/>.</returns>
     IGrainCallsBuilder And();
 }
+#pragma warning restore CA1716

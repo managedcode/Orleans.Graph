@@ -1,9 +1,8 @@
 using System.Diagnostics;
-using Orleans;
-using Orleans.Runtime;
 
 namespace ManagedCode.Orleans.Graph.Models;
 
+#pragma warning disable CA1716 // Existing public model name retained for package compatibility.
 [Immutable]
 [GenerateSerializer]
 [Alias("MC.Call")]
@@ -27,3 +26,4 @@ public class Call(GrainId? sourceId, GrainId? targetId, Direction direction, str
 
     public override string ToString() => $"Direction: {Direction,-3} | Interface: {Interface,-20} | Method: {Method}";
 }
+#pragma warning restore CA1716

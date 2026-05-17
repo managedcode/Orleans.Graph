@@ -1,14 +1,13 @@
 using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
 using ManagedCode.Orleans.Graph.Tests.Cluster.Grains.Interfaces;
-using Xunit;
 
 namespace ManagedCode.Orleans.Graph.Tests;
 
 public class GrainTransitionManagerTests
 {
 
-    [Fact]
+    [Test]
     public void IsTransitionAllowed_SingleValidTransition_ReturnsTrue()
     {
         var graph = GrainCallsBuilder.Create()
@@ -22,10 +21,10 @@ public class GrainTransitionManagerTests
         callHistory.Push(new Call(null, null, Direction.Out, typeof(IGrainA).FullName!, nameof(IGrainA.MethodA1)));
         callHistory.Push(new Call(null, null, Direction.In, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1)));
 
-        Assert.True(graph.IsTransitionAllowed(callHistory));
+        graph.IsTransitionAllowed(callHistory).ShouldBeTrue();
     }
 
-    [Fact]
+    [Test]
     public void IsTransitionAllowed_InvalidTransition_ReturnsFalse()
     {
         var graph = GrainCallsBuilder.Create()
@@ -39,10 +38,10 @@ public class GrainTransitionManagerTests
         callHistory.Push(new Call(null, null, Direction.Out, typeof(IGrainA).FullName!, nameof(IGrainA.MethodA1)));
         callHistory.Push(new Call(null, null, Direction.In, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1)));
 
-        Assert.False(graph.IsTransitionAllowed(callHistory));
+        graph.IsTransitionAllowed(callHistory).ShouldBeFalse();
     }
 
-    [Fact]
+    [Test]
     public void IsTransitionAllowed_EmptyCallHistory_ReturnsFalse()
     {
         var graph = GrainCallsBuilder.Create()
@@ -54,10 +53,10 @@ public class GrainTransitionManagerTests
 
         var callHistory = new CallHistory();
 
-        Assert.False(graph.IsTransitionAllowed(callHistory));
+        graph.IsTransitionAllowed(callHistory).ShouldBeFalse();
     }
 
-    [Fact]
+    [Test]
     public void IsTransitionAllowed_ReentrancyAllowed_ReturnsTrue()
     {
         var graph = GrainCallsBuilder.Create()
@@ -75,10 +74,10 @@ public class GrainTransitionManagerTests
         callHistory.Push(new Call(null, null, Direction.Out, typeof(IGrainA).FullName!, nameof(IGrainA.MethodA1)));
         callHistory.Push(new Call(null, null, Direction.In, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1)));
 
-        Assert.True(graph.IsTransitionAllowed(callHistory));
+        graph.IsTransitionAllowed(callHistory).ShouldBeTrue();
     }
 
-    [Fact]
+    [Test]
     public void IsTransitionAllowed_PreservesMultipleMethodRules()
     {
         var graph = GrainCallsBuilder.Create()
@@ -92,20 +91,20 @@ public class GrainTransitionManagerTests
         var firstAllowed = new CallHistory();
         firstAllowed.Push(new Call(null, null, Direction.Out, typeof(IGrainA).FullName!, nameof(IGrainA.MethodA1)));
         firstAllowed.Push(new Call(null, null, Direction.In, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1)));
-        Assert.True(graph.IsTransitionAllowed(firstAllowed));
+        graph.IsTransitionAllowed(firstAllowed).ShouldBeTrue();
 
         var secondAllowed = new CallHistory();
         secondAllowed.Push(new Call(null, null, Direction.Out, typeof(IGrainA).FullName!, nameof(IGrainA.MethodB1)));
         secondAllowed.Push(new Call(null, null, Direction.In, typeof(IGrainB).FullName!, nameof(IGrainB.MethodC2)));
-        Assert.True(graph.IsTransitionAllowed(secondAllowed));
+        graph.IsTransitionAllowed(secondAllowed).ShouldBeTrue();
 
         var disallowed = new CallHistory();
         disallowed.Push(new Call(null, null, Direction.Out, typeof(IGrainA).FullName!, nameof(IGrainA.MethodC1)));
         disallowed.Push(new Call(null, null, Direction.In, typeof(IGrainB).FullName!, nameof(IGrainB.MethodC2)));
-        Assert.False(graph.IsTransitionAllowed(disallowed));
+        graph.IsTransitionAllowed(disallowed).ShouldBeFalse();
     }
 
-    [Fact]
+    [Test]
     public void IsTransitionAllowed_AllowAllByDefault_AllowsMissingTransitions()
     {
         var graph = GrainCallsBuilder.Create()
@@ -116,10 +115,10 @@ public class GrainTransitionManagerTests
         callHistory.Push(new Call(null, null, Direction.Out, typeof(IGrainA).FullName!, nameof(IGrainA.MethodA1)));
         callHistory.Push(new Call(null, null, Direction.In, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1)));
 
-        Assert.True(graph.IsTransitionAllowed(callHistory));
+        graph.IsTransitionAllowed(callHistory).ShouldBeTrue();
     }
 
-    [Fact]
+    [Test]
     public void IsTransitionAllowed_DisallowAllAfterAllowAll_DeniesMissingTransitions()
     {
         var graph = GrainCallsBuilder.Create()
@@ -131,10 +130,10 @@ public class GrainTransitionManagerTests
         callHistory.Push(new Call(null, null, Direction.Out, typeof(IGrainA).FullName!, nameof(IGrainA.MethodA1)));
         callHistory.Push(new Call(null, null, Direction.In, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1)));
 
-        Assert.False(graph.IsTransitionAllowed(callHistory));
+        graph.IsTransitionAllowed(callHistory).ShouldBeFalse();
     }
 
-    [Fact]
+    [Test]
     public void IsTransitionAllowed_MethodRuleAllowed_ReturnsTrue()
     {
         var graph = GrainCallsBuilder.Create()
@@ -148,10 +147,10 @@ public class GrainTransitionManagerTests
         callHistory.Push(new Call(null, null, Direction.Out, typeof(IGrainA).FullName!, nameof(IGrainA.MethodA1)));
         callHistory.Push(new Call(null, null, Direction.In, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1)));
 
-        Assert.True(graph.IsTransitionAllowed(callHistory));
+        graph.IsTransitionAllowed(callHistory).ShouldBeTrue();
     }
 
-    [Fact]
+    [Test]
     public void IsTransitionAllowed_SelfLoopTransition_ReturnsTrue()
     {
         var graph = GrainCallsBuilder.Create()
@@ -164,10 +163,10 @@ public class GrainTransitionManagerTests
         callHistory.Push(new Call(null, null, Direction.Out, typeof(IGrainA).FullName!, nameof(IGrainA.MethodA1)));
         callHistory.Push(new Call(null, null, Direction.In, typeof(IGrainA).FullName!, nameof(IGrainA.MethodA1)));
 
-        Assert.True(graph.IsTransitionAllowed(callHistory));
+        graph.IsTransitionAllowed(callHistory).ShouldBeTrue();
     }
 
-    [Fact]
+    [Test]
     public void IsTransitionAllowed_DisallowedTransition_ReturnsFalse()
     {
         var graph = GrainCallsBuilder.Create()
@@ -181,10 +180,10 @@ public class GrainTransitionManagerTests
         callHistory.Push(new Call(null, null, Direction.Out, typeof(IGrainA).FullName!, nameof(IGrainA.MethodA1)));
         callHistory.Push(new Call(null, null, Direction.In, typeof(IGrainC).FullName!, nameof(IGrainC.MethodC1)));
 
-        Assert.False(graph.IsTransitionAllowed(callHistory));
+        graph.IsTransitionAllowed(callHistory).ShouldBeFalse();
     }
 
-    [Fact]
+    [Test]
     public void IsTransitionAllowed_MultipleValidTransitions_ReturnsTrue()
     {
         var graph = GrainCallsBuilder.Create()
@@ -204,10 +203,10 @@ public class GrainTransitionManagerTests
         callHistory.Push(new Call(null, null, Direction.Out, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1)));
         callHistory.Push(new Call(null, null, Direction.In, typeof(IGrainC).FullName!, nameof(IGrainC.MethodC1)));
 
-        Assert.True(graph.IsTransitionAllowed(callHistory));
+        graph.IsTransitionAllowed(callHistory).ShouldBeTrue();
     }
 
-    [Fact]
+    [Test]
     public void IsTransitionAllowed_InvalidMethodRule_ReturnsFalse()
     {
         var graph = GrainCallsBuilder.Create()
@@ -221,15 +220,15 @@ public class GrainTransitionManagerTests
         callHistory.Push(new Call(null, null, Direction.Out, typeof(IGrainA).FullName!, nameof(IGrainA.MethodA1)));
         callHistory.Push(new Call(null, null, Direction.In, typeof(IGrainB).FullName!, "MethodC2"));
 
-        Assert.False(graph.IsTransitionAllowed(callHistory));
+        graph.IsTransitionAllowed(callHistory).ShouldBeFalse();
     }
 
-    [Fact]
+    [Test]
     public void IsTransitionAllowed_DetectsComplexLoop_ThrowsExceptionOnBuild()
     {
-        var exception = Assert.Throws<InvalidOperationException>(() =>
+        var exception = Should.Throw<InvalidOperationException>(() =>
         {
-            var graph = GrainCallsBuilder.Create()
+            GrainCallsBuilder.Create()
                 .From<IGrainA>()
                 .To<IGrainB>()
                 .AllMethods()
@@ -249,10 +248,27 @@ public class GrainTransitionManagerTests
                 .Build();
         });
 
-        Assert.Equal("Adding transition from ManagedCode.Orleans.Graph.Tests.Cluster.Grains.Interfaces.IGrainD to ManagedCode.Orleans.Graph.Tests.Cluster.Grains.Interfaces.IGrainA creates a cycle.", exception.Message);
+        exception.Message.ShouldBe("Adding transition from ManagedCode.Orleans.Graph.Tests.Cluster.Grains.Interfaces.IGrainD to ManagedCode.Orleans.Graph.Tests.Cluster.Grains.Interfaces.IGrainA creates a cycle.");
     }
 
-    [Fact]
+    [Test]
+    public void Build_AllowsCycleWhenOneEdgeIsReentrant()
+    {
+        var graph = GrainCallsBuilder.Create()
+            .From<IGrainA>()
+            .To<IGrainB>()
+            .WithReentrancy()
+            .And()
+            .From<IGrainB>()
+            .To<IGrainA>()
+            .AllMethods()
+            .And()
+            .Build();
+
+        graph.GeneratePolicyMermaidDiagram().ShouldContain("-.->");
+    }
+
+    [Test]
     public void IsTransitionAllowed_DetectsSimpleLoop_ReturnsFalse()
     {
         var graph = GrainCallsBuilder.Create()
@@ -274,10 +290,10 @@ public class GrainTransitionManagerTests
         callHistory.Push(new Call(null, null, Direction.Out, typeof(IGrainC).FullName!, nameof(IGrainC.MethodC1)));
         callHistory.Push(new Call(null, null, Direction.In, typeof(IGrainA).FullName!, nameof(IGrainA.MethodA1)));
 
-        Assert.False(graph.IsTransitionAllowed(callHistory));
+        graph.IsTransitionAllowed(callHistory).ShouldBeFalse();
     }
 
-    [Fact]
+    [Test]
     public void IsTransitionAllowed_NoLoop_ReturnsTrue()
     {
         var graph = GrainCallsBuilder.Create()
@@ -297,10 +313,10 @@ public class GrainTransitionManagerTests
         callHistory.Push(new Call(null, null, Direction.Out, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1)));
         callHistory.Push(new Call(null, null, Direction.In, typeof(IGrainC).FullName!, nameof(IGrainC.MethodC1)));
 
-        Assert.True(graph.IsTransitionAllowed(callHistory));
+        graph.IsTransitionAllowed(callHistory).ShouldBeTrue();
     }
 
-    [Fact]
+    [Test]
     public void DetectDeadlocks_IgnoresReentrantTransitions()
     {
         var graph = GrainCallsBuilder.Create()
@@ -315,10 +331,10 @@ public class GrainTransitionManagerTests
         callHistory.Push(new OutCall(grainId, grainId, typeof(IGrainA).FullName!, typeof(IGrainA).FullName!, nameof(IGrainA.MethodA1)));
         callHistory.Push(new InCall(grainId, grainId, typeof(IGrainA).FullName!, nameof(IGrainA.MethodA1)));
 
-        Assert.False(graph.DetectDeadlocks(callHistory));
+        graph.DetectDeadlocks(callHistory).ShouldBeFalse();
     }
 
-    [Fact]
+    [Test]
     public void GeneratePolicyMermaidDiagram_ProducesEdges()
     {
         var graph = GrainCallsBuilder.Create()
@@ -330,13 +346,38 @@ public class GrainTransitionManagerTests
 
         var diagram = graph.GeneratePolicyMermaidDiagram();
 
-        Assert.Contains("graph LR", diagram);
-        Assert.Contains("[\"IGrainA\"]", diagram);
-        Assert.Contains("[\"IGrainB\"]", diagram);
-        Assert.Contains("all", diagram);
+        diagram.ShouldContain("graph LR");
+        diagram.ShouldContain("[\"IGrainA\"]");
+        diagram.ShouldContain("[\"IGrainB\"]");
+        diagram.ShouldContain("all");
     }
 
-    [Fact]
+    [Test]
+    public void GetPolicyEdges_ReturnsOrderedSnapshot()
+    {
+        var graph = GrainCallsBuilder.Create()
+            .From<IGrainB>()
+            .To<IGrainC>()
+            .MethodByName(nameof(IGrainB.MethodB1), nameof(IGrainC.MethodC1))
+            .And()
+            .From<IGrainA>()
+            .To<IGrainB>()
+            .AllMethods()
+            .And()
+            .Build();
+
+        var edges = graph.GetPolicyEdges().ToArray();
+
+        edges.Length.ShouldBe(2);
+        edges[0].Source.ShouldBe(typeof(IGrainA).FullName);
+        edges[0].Target.ShouldBe(typeof(IGrainB).FullName);
+        edges[0].Transitions.Single().ShouldBe(new GrainTransition("*", "*"));
+        edges[1].Source.ShouldBe(typeof(IGrainB).FullName);
+        edges[1].Target.ShouldBe(typeof(IGrainC).FullName);
+        edges[1].Transitions.Single().ShouldBe(new GrainTransition(nameof(IGrainB.MethodB1), nameof(IGrainC.MethodC1)));
+    }
+
+    [Test]
     public void GenerateLiveMermaidDiagram_HighlightsActiveEdges()
     {
         var graph = GrainCallsBuilder.Create()
@@ -352,10 +393,10 @@ public class GrainTransitionManagerTests
 
         var diagram = graph.GenerateLiveMermaidDiagram(callHistory);
 
-        Assert.Contains("==>", diagram);
+        diagram.ShouldContain("==>");
     }
 
-    [Fact]
+    [Test]
     public void GeneratePolicyMermaidDiagram_MarksReentrantEdges()
     {
         var graph = GrainCallsBuilder.Create()
@@ -366,10 +407,10 @@ public class GrainTransitionManagerTests
 
         var diagram = graph.GeneratePolicyMermaidDiagram();
 
-        Assert.Contains("-.->", diagram);
+        diagram.ShouldContain("-.->");
     }
 
-    [Fact]
+    [Test]
     public void GeneratePolicyMermaidDiagram_RendersMultipleMethodLabels()
     {
         var graph = GrainCallsBuilder.Create()
@@ -382,10 +423,10 @@ public class GrainTransitionManagerTests
 
         var diagram = graph.GeneratePolicyMermaidDiagram();
 
-        Assert.Contains("<br/>", diagram);
+        diagram.ShouldContain("<br/>");
     }
 
-    [Fact]
+    [Test]
     public void GenerateLiveMermaidDiagram_AppendsUsageCounts()
     {
         var graph = GrainCallsBuilder.Create()
@@ -403,6 +444,6 @@ public class GrainTransitionManagerTests
 
         var diagram = graph.GenerateLiveMermaidDiagram(callHistory);
 
-        Assert.Contains("hits: 2", diagram);
+        diagram.ShouldContain("hits: 2");
     }
 }

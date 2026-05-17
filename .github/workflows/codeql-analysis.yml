@@ -9,7 +9,7 @@ on:
     - cron: '0 0 * * 1'
 
 env:
-  DOTNET_VERSION: '9.0.x'
+  DOTNET_VERSION: '10.0.x'
 
 jobs:
   analyze:
@@ -29,17 +29,17 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v5
 
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: ${{ env.DOTNET_VERSION }}
-
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v4
       with:
         languages: ${{ matrix.language }}
 
-    - name: Restore dependencies
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: ${{ env.DOTNET_VERSION }}
+
+    - name: Restore
       run: dotnet restore Orleans.Graph.slnx
 
     - name: Build

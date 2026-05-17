@@ -1,7 +1,6 @@
-using Orleans;
-
 namespace ManagedCode.Orleans.Graph;
 
+#pragma warning disable CA1716 // Fluent DSL intentionally uses And for readable chaining.
 /// <summary>
 /// Interface for building grain calls in an Orleans graph.
 /// </summary>
@@ -60,3 +59,4 @@ public interface IGrainCallsBuilder
     /// <returns>An instance of <see cref="GrainTransitionManager"/>.</returns>
     GrainTransitionManager Build();
 }
+#pragma warning restore CA1716

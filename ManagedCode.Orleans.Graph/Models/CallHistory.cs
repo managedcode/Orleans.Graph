@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using Orleans;
 
 namespace ManagedCode.Orleans.Graph.Models;
 
@@ -12,7 +8,8 @@ namespace ManagedCode.Orleans.Graph.Models;
 [DebuggerDisplay("{ToString()}")]
 public class CallHistory
 {
-    [Id(0)] public Guid Id = Guid.NewGuid();
+    [Id(0)]
+    public Guid Id { get; set; } = Guid.NewGuid();
 
     [Id(1)]
     public Stack<Call> History { get; } = new();

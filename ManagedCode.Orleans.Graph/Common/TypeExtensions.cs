@@ -1,5 +1,3 @@
-using System;
-
 namespace ManagedCode.Orleans.Graph;
 
 internal static class TypeExtensions

@@ -1,27 +1,36 @@
 using ManagedCode.Orleans.Graph.Models;
-using Xunit;
 
 namespace ManagedCode.Orleans.Graph.Tests;
 
 public class DirectedGraphTests
 {
-    [Fact]
+    [Test]
     public void AddTransition_PreservesMultipleRules()
     {
         var graph = new DirectedGraph(true);
         graph.AddTransition("source", "target", new GrainTransition("Method1", "MethodA"));
         graph.AddTransition("source", "target", new GrainTransition("Method2", "MethodB"));
 
-        Assert.True(graph.IsTransitionAllowed("source", "target", "Method1", "MethodA"));
-        Assert.True(graph.IsTransitionAllowed("source", "target", "Method2", "MethodB"));
+        graph.IsTransitionAllowed("source", "target", "Method1", "MethodA").ShouldBeTrue();
+        graph.IsTransitionAllowed("source", "target", "Method2", "MethodB").ShouldBeTrue();
     }
 
-    [Fact]
+    [Test]
     public void HasReentrantTransition_ReturnsTrueForSelfLoop()
     {
         var graph = new DirectedGraph(true);
         graph.AddTransition("source", "source", new GrainTransition("*", "*", IsReentrant: true));
 
-        Assert.True(graph.HasReentrantTransition("source", "source"));
+        graph.HasReentrantTransition("source", "source").ShouldBeTrue();
+    }
+
+    [Test]
+    public void AddTransition_AllowsCycleThroughReentrantEdge()
+    {
+        var graph = new DirectedGraph(true);
+        graph.AddTransition("source", "target", new GrainTransition("*", "*", IsReentrant: true));
+        graph.AddTransition("target", "source", new GrainTransition("*", "*"));
+
+        graph.HasCycle().ShouldBeFalse();
     }
 }

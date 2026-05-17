@@ -1,9 +1,5 @@
-using System;
-using System.Linq;
 using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
-using Orleans;
-using Orleans.Runtime;
 
 namespace ManagedCode.Orleans.Graph.Extensions;
 
@@ -30,7 +26,7 @@ public static class RequestContextHelper
 
     public static bool TrackIncomingCall(this IIncomingGrainCallContext context, GraphCallFilterConfig graphCallFilterConfig)
     {
-        if (!graphCallFilterConfig.TrackOrleansCalls && context.ImplementationMethod.Module.Name.StartsWith("Orleans."))
+        if (!graphCallFilterConfig.TrackOrleansCalls && context.ImplementationMethod.Module.Name.StartsWith("Orleans.", StringComparison.Ordinal))
         {
             return false;
         }
@@ -40,7 +36,7 @@ public static class RequestContextHelper
 
     public static bool TrackOutgoingCall(this IOutgoingGrainCallContext context, GraphCallFilterConfig graphCallFilterConfig)
     {
-        if (!graphCallFilterConfig.TrackOrleansCalls && context.InterfaceMethod.Module.Name.StartsWith("Orleans."))
+        if (!graphCallFilterConfig.TrackOrleansCalls && context.InterfaceMethod.Module.Name.StartsWith("Orleans.", StringComparison.Ordinal))
         {
             return false;
         }

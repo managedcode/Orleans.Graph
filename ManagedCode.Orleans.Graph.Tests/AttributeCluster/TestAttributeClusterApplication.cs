@@ -1,11 +1,11 @@
 using Orleans.TestingHost;
-using Xunit;
 
 namespace ManagedCode.Orleans.Graph.Tests.AttributeCluster;
 
-[CollectionDefinition(nameof(TestAttributeClusterApplication))]
-public class TestAttributeClusterApplication : ICollectionFixture<TestAttributeClusterApplication>, IDisposable
+public class TestAttributeClusterApplication : IDisposable, IAsyncDisposable
 {
+    private bool _disposed;
+
     public TestCluster Cluster { get; }
 
     public TestAttributeClusterApplication()
@@ -19,6 +19,25 @@ public class TestAttributeClusterApplication : ICollectionFixture<TestAttributeC
 
     public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
         Cluster.Dispose();
+        GC.SuppressFinalize(this);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+        await Cluster.DisposeAsync();
+        GC.SuppressFinalize(this);
     }
 }

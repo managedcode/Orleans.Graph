@@ -6,7 +6,10 @@ on:
   workflow_dispatch:
 
 env:
-  DOTNET_VERSION: '9.0.x'
+  DOTNET_VERSION: '10.0.x'
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -32,6 +35,9 @@ jobs:
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "Version from Directory.Build.props: $VERSION"
 
+    - name: Restore local tools
+      run: dotnet tool restore
+
     - name: Restore dependencies
       run: dotnet restore Orleans.Graph.slnx
 
@@ -39,10 +45,10 @@ jobs:
       run: dotnet build Orleans.Graph.slnx --configuration Release --no-restore
 
     - name: Test
-      run: dotnet test Orleans.Graph.slnx --configuration Release --no-build --verbosity normal
+      run: dotnet test --solution Orleans.Graph.slnx --configuration Release --no-build --verbosity normal
 
     - name: Pack NuGet packages
-      run: dotnet pack ManagedCode.Orleans.Graph/ManagedCode.Orleans.Graph.csproj --configuration Release --no-build --output ./artifacts
+      run: dotnet pack Orleans.Graph.slnx --configuration Release --no-build -p:IncludeSymbols=false -p:SymbolPackageFormat=snupkg --output ./artifacts
 
     - name: Upload artifacts
       uses: actions/upload-artifact@v4

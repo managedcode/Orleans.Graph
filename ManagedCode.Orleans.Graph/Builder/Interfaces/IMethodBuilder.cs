@@ -1,9 +1,8 @@
-using System;
 using System.Linq.Expressions;
-using Orleans;
 
 namespace ManagedCode.Orleans.Graph;
 
+#pragma warning disable CA1716 // Fluent DSL intentionally uses And for readable chaining.
 /// <summary>
 /// Interface for building methods in an Orleans graph.
 /// </summary>
@@ -77,3 +76,4 @@ public interface IMethodBuilder<TSource, TTarget> where TSource : IGrain where T
     /// <returns>An instance of <see cref="IGrainCallsBuilder"/>.</returns>
     IGrainCallsBuilder And();
 }
+#pragma warning restore CA1716

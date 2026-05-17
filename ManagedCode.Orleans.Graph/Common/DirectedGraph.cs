@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using ManagedCode.Orleans.Graph.Models;
 
 namespace ManagedCode.Orleans.Graph;
@@ -13,16 +10,15 @@ public class DirectedGraph(bool allowSelfLoops = false)
 
     public void AddVertex(string vertex)
     {
-        if (!_vertices.Contains(vertex))
+        if (_vertices.Add(vertex))
         {
-            _vertices.Add(vertex);
             _adjacencyList[vertex] = new Dictionary<string, HashSet<GrainTransition>>();
         }
     }
 
     public void AddTransition(string source, string target, GrainTransition transition)
     {
-        if (!_allowSelfLoops && source.Equals(target))
+        if (!_allowSelfLoops && string.Equals(source, target, StringComparison.Ordinal))
         {
             return;
         }
@@ -41,7 +37,7 @@ public class DirectedGraph(bool allowSelfLoops = false)
         if (!transition.IsReentrant && HasCycle())
         {
             transitions.Remove(transition);
-            if (!_adjacencyList[source][target].Any())
+            if (_adjacencyList[source][target].Count == 0)
             {
                 _adjacencyList[source].Remove(target);
             }
@@ -78,14 +74,19 @@ public class DirectedGraph(bool allowSelfLoops = false)
     {
         if (!visited.Contains(vertex))
         {
-            visited.Add(vertex);
+            _ = visited.Add(vertex);
             recursionStack.Add(vertex);
 
             if (_adjacencyList.TryGetValue(vertex, out var value))
             {
-                foreach (var neighbor in value.Keys)
+                foreach (var (neighbor, transitions) in value)
                 {
-                    if (_allowSelfLoops && vertex.Equals(neighbor))
+                    if (transitions.All(static transition => transition.IsReentrant))
+                    {
+                        continue;
+                    }
+
+                    if (_allowSelfLoops && string.Equals(vertex, neighbor, StringComparison.Ordinal))
                     {
                         continue;
                     }

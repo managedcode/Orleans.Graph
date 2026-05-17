@@ -1,17 +1,15 @@
 using ManagedCode.Orleans.Graph.Tests.Cluster;
 using ManagedCode.Orleans.Graph.Tests.Cluster.Grains.Interfaces;
-using Xunit;
-using Xunit.Abstractions;
 
 namespace ManagedCode.Orleans.Graph.Tests;
 
-[Collection(nameof(TestClusterApplication))]
-public class GraphTests(TestClusterApplication testApp, ITestOutputHelper outputHelper)
+[ClassDataSource<TestClusterApplication>(Shared = SharedType.PerTestSession)]
+public class GraphTests(TestClusterApplication testApp)
 {
     private readonly TestClusterApplication _testApp = testApp;
 
-    [Fact]
-    public async Task GrainA_A1Test()
+    [Test]
+    public async Task GrainA_A1TestAsync()
     {
         await _testApp.Cluster
             .Client
@@ -19,8 +17,8 @@ public class GraphTests(TestClusterApplication testApp, ITestOutputHelper output
             .MethodA1(1);
     }
 
-    [Fact]
-    public async Task GrainB_B1Test()
+    [Test]
+    public async Task GrainB_B1TestAsync()
     {
         await _testApp.Cluster
             .Client
@@ -28,10 +26,10 @@ public class GraphTests(TestClusterApplication testApp, ITestOutputHelper output
             .MethodB1(1);
     }
 
-    [Fact]
-    public async Task GrainC_C1Test()
+    [Test]
+    public async Task GrainC_C1TestAsync()
     {
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        var exception = await Should.ThrowAsync<InvalidOperationException>(async () =>
         {
             await _testApp.Cluster
                 .Client
@@ -39,13 +37,13 @@ public class GraphTests(TestClusterApplication testApp, ITestOutputHelper output
                 .MethodC1(1);
         });
 
-        Assert.StartsWith(
-            "Transition from ORLEANS_GRAIN_CLIENT to ManagedCode.Orleans.Graph.Tests.Cluster.Grains.Interfaces.IGrainC is not allowed.",
-            exception.Message);
+        exception.Message
+            .StartsWith("Transition from ORLEANS_GRAIN_CLIENT to ManagedCode.Orleans.Graph.Tests.Cluster.Grains.Interfaces.IGrainC is not allowed.", StringComparison.Ordinal)
+            .ShouldBeTrue();
     }
 
-    [Fact]
-    public async Task GrainA_B1Test()
+    [Test]
+    public async Task GrainA_B1TestAsync()
     {
         await _testApp.Cluster
             .Client
@@ -53,8 +51,8 @@ public class GraphTests(TestClusterApplication testApp, ITestOutputHelper output
             .MethodB1(1);
     }
 
-    [Fact]
-    public async Task GrainACallsTest()
+    [Test]
+    public async Task GrainACallsTestAsync()
     {
         await _testApp.Cluster
             .Client
@@ -66,7 +64,7 @@ public class GraphTests(TestClusterApplication testApp, ITestOutputHelper output
             .GetGrain<IGrainA>("1")
             .MethodB1(1);
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        var exception = await Should.ThrowAsync<InvalidOperationException>(async () =>
         {
             await _testApp.Cluster
                 .Client
@@ -74,13 +72,13 @@ public class GraphTests(TestClusterApplication testApp, ITestOutputHelper output
                 .MethodC1(1);
         });
 
-        Assert.StartsWith("Transition from", exception.Message);
+        exception.Message.ShouldStartWith("Transition from");
     }
 
-    [Fact]
-    public async Task DeadLock_Tests()
+    [Test]
+    public async Task DeadLock_TestsAsync()
     {
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        var exception = await Should.ThrowAsync<InvalidOperationException>(async () =>
         {
             await _testApp.Cluster
                 .Client
@@ -88,6 +86,6 @@ public class GraphTests(TestClusterApplication testApp, ITestOutputHelper output
                 .MethodB2(1);
         });
 
-        Assert.StartsWith("Deadlock detected.", exception.Message);
+        exception.Message.ShouldStartWith("Deadlock detected.");
     }
 }

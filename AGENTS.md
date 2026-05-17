@@ -32,6 +32,8 @@ Update guidelines:
 - **Call Tracking**: Resolve outgoing call identities from the Orleans context (`SourceId`/interface metadata) instead of guessing via reflection order to avoid mislabelling callers.
 - **Configuration Flags**: Treat `AllowAll`/`DisallowAll` on `GrainCallsBuilder` as authoritative defaults; ensure runtime checks respect the builder’s chosen baseline before reporting violations.
 - **Testing Scope**: Exercise new behavior through the Orleans-hosted integration tests in `ManagedCode.Orleans.Graph.Tests`, covering both positive and negative paths to mirror real cluster flows.
+- **Test Framework**: Use TUnit for tests and Shouldly for assertions; do not introduce FluentAssertions, so the test style stays aligned with the newer ManagedCode Orleans projects.
+- **Migration Releases**: For major framework/package migrations, complete three strict code-review-and-fix iterations before README polish, feature additions, commit, push, and CI verification, so release branches are hardened before publication.
 - **Code Style**: Use enums or constants over magic literals, keep documentation and comments in English, and avoid template placeholders—name files and types for their real domain roles.
 
 
@@ -44,7 +46,7 @@ Update guidelines:
 - `Directory.Build.props` – shared project metadata, target framework, and packaging settings.
 
 ## Current Status
-The directed-graph engine, grain call filters, and builder DSL compile against .NET 9 and are validated by unit and integration tests. Recent fixes ensure additive transition rules, consistent caller identification, and respect for `AllowAll` defaults; coverage now guards against regressions in these areas.
+The directed-graph engine, grain call filters, and builder DSL compile against .NET 10 / Orleans 10 and are validated by TUnit unit and integration tests. Recent fixes ensure additive transition rules, consistent caller identification, respect for `AllowAll` defaults, and reentrant policy-cycle handling; coverage now guards against regressions in these areas.
 
 ## Next Steps
 - Expand test fixtures to cover mixed client/grain scenarios and additional reentrancy configurations.

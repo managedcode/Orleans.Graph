@@ -1,77 +1,143 @@
 ![Orleans Graph](https://raw.githubusercontent.com/managedcode/Orleans.Graph/main/logo.png)
 
-# Orleans Graph
+# ManagedCode.Orleans.Graph
 
 [![NuGet](https://badge.fury.io/nu/ManagedCode.Orleans.Graph.svg)](https://www.nuget.org/packages/ManagedCode.Orleans.Graph)
 [![CI](https://github.com/managedcode/Orleans.Graph/actions/workflows/ci.yml/badge.svg)](https://github.com/managedcode/Orleans.Graph/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/managedcode/Orleans.Graph/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/managedcode/Orleans.Graph/actions/workflows/codeql-analysis.yml)
 
-**Declare the grain-to-grain traffic you allow, block everything else, and see the graph in real time.**
+Grain-to-grain call policy enforcement for Microsoft Orleans applications.
 
-## What You Get
-- Fluent builder *and* attributes for defining permitted grain hops
-- Incoming/outgoing filters that stop unauthorised calls before your code runs
-- Deadlock detection with opt-in reentrancy
-- Mermaid diagrams for both configured policy and live call history
+The library lets a silo declare the grain calls it permits, blocks missing transitions before target grain code runs, and keeps enough request context to detect unsafe runtime call cycles.
 
-## Quick Start
+## Features
+
+- Fluent builder API for source grain, target grain, method, client-call, and reentrancy rules.
+- Attribute-based graph configuration for colocating policies with grain contracts.
+- Incoming and outgoing Orleans call filters for runtime enforcement.
+- Deadlock detection for active grain call chains, with opt-in self-reentrancy.
+- Mermaid policy and live-call diagrams.
+- Policy edge snapshots through `GetPolicyEdges()` for diagnostics and custom visualizers.
+- .NET 10, Orleans 10, central package management, TUnit tests, and CI coverage reporting.
+
+## Requirements
+
+- .NET SDK 10
+- Microsoft Orleans 10
+
+## Installation
+
+```sh
+dotnet add package ManagedCode.Orleans.Graph
+```
+
+## Silo Setup
+
+Register the graph filters on the silo and configure allowed transitions.
+
 ```csharp
-// Silo
-builder.AddOrleansGraph(
-    configureGraph: graph =>
-    {
-        graph.AddGrainTransition<IOrderGrain, IPaymentGrain>()
-             .Method(o => o.SubmitAsync(default!), p => p.ChargeAsync(default!))
-             .WithReentrancy()
-             .And()
-             .AllowClientCallGrain<IOrderGrain>();
-    });
+using ManagedCode.Orleans.Graph;
+using ManagedCode.Orleans.Graph.Extensions;
+using ManagedCode.Orleans.Graph.Interfaces;
 
-// Client – attributes + defaults are enough
+siloBuilder.AddOrleansGraph(graph =>
+{
+    graph.AllowClientCallGrain<IOrderGrain>();
+
+    graph.AddGrainTransition<IOrderGrain, IPaymentGrain>()
+        .Method(
+            source => source.SubmitAsync(GraphParam.Any<Order>()),
+            target => target.ChargeAsync(GraphParam.Any<Payment>()))
+        .And();
+
+    graph.AddGrain<IPaymentGrain>()
+        .WithReentrancy();
+});
+```
+
+Register the client-side outgoing filter when Orleans clients should participate in the same call-history tracking.
+
+```csharp
 clientBuilder.AddOrleansGraph();
 ```
 
+Use `AllowAll()` only when you want graph rules to document expected traffic without blocking unconfigured transitions.
+
+## Attribute Setup
+
+Attributes are scanned automatically from loaded assemblies. Pass explicit assemblies when startup should avoid scanning the full `AppDomain`.
+
 ```csharp
+using ManagedCode.Orleans.Graph.Attributes;
+
 [AllowClientCall]
-[AllowGrainCall(typeof(IPaymentGrain), AllowAllMethods = true, AllowReentrancy = true)]
+[AllowGrainCall(
+    typeof(IPaymentGrain),
+    AllowAllMethods = false,
+    SourceMethods = [nameof(IOrderGrain.SubmitAsync)],
+    TargetMethods = [nameof(IPaymentGrain.ChargeAsync)])]
 public interface IOrderGrain : IGrainWithStringKey
 {
-    Task SubmitAsync(Order dto);
+    Task SubmitAsync(Order order);
 }
 
 [AllowSelfReentrancy]
-[AllowGrainCall(typeof(IOrderGrain), SourceMethods = new[] { nameof(IPaymentGrain.ChargeAsync) }, TargetMethods = new[] { nameof(IOrderGrain.SubmitAsync) })]
 public interface IPaymentGrain : IGrainWithStringKey
 {
     Task ChargeAsync(Payment payment);
 }
-
-public record Payment;
 ```
 
-## Visualise the Graph (Mermaid)
+## Diagnostics
+
+Generate configured-policy and live-call Mermaid diagrams.
+
 ```csharp
-var manager = services.GetRequiredService<GrainTransitionManager>();
-var policy = manager.GeneratePolicyMermaidDiagram();
+var manager = serviceProvider.GetRequiredService<GrainTransitionManager>();
 
-var history = new CallHistory();
-history.Push(new OutCall(null, null, typeof(IOrderGrain).FullName!, typeof(IPaymentGrain).FullName!, "SubmitAsync"));
-history.Push(new InCall(null, null, typeof(IPaymentGrain).FullName!, "ChargeAsync"));
-var live = manager.GenerateLiveMermaidDiagram(history);
+var policyDiagram = manager.GeneratePolicyMermaidDiagram();
+var liveDiagram = manager.GenerateLiveMermaidDiagram(callHistory);
 ```
-`-->` means allowed, `-.->` reentrant, `==>` active edge with `hits: N`.
 
-## Runtime Guarantees
-- Outgoing filter records every hop; incoming filter enforces the graph
-- Deadlocks are detected unless the edge is marked reentrant
-- Client → grain rules reuse the same builder/attribute API
+Inspect the configured policy without parsing Mermaid.
 
-## Tests & Coverage
-```bash
+```csharp
+foreach (var edge in manager.GetPolicyEdges())
+{
+    Console.WriteLine($"{edge.Source} -> {edge.Target}: {edge.Transitions.Count} rule(s)");
+}
+```
+
+Mermaid arrows:
+
+- `-->` configured transition
+- `-.->` reentrant transition
+- `==>` active live-call edge
+
+## Development
+
+```sh
+dotnet tool restore
+dotnet restore Orleans.Graph.slnx
 dotnet format Orleans.Graph.slnx
-dotnet test Orleans.Graph.slnx --configuration Release -p:CollectCoverage=true -p:CoverletOutput=coverage/
+dotnet build Orleans.Graph.slnx --configuration Release --no-restore -p:RunAnalyzers=true
+dotnet test --solution Orleans.Graph.slnx --configuration Release --no-build --verbosity normal
 ```
-Automated suites cover fluent policies, attribute discovery (AppDomain scan), attribute-only TestCluster, and graph internals (~86 % line / 81 % branch).
+
+Coverage uses the local tool manifest:
+
+```sh
+dotnet tool run coverlet ManagedCode.Orleans.Graph.Tests/bin/Release/net10.0/ManagedCode.Orleans.Graph.Tests.dll \
+  --target "dotnet" \
+  --targetargs "test --project ManagedCode.Orleans.Graph.Tests/ManagedCode.Orleans.Graph.Tests.csproj --configuration Release --no-build --no-restore" \
+  --format cobertura \
+  --output artifacts/coverage/coverage.cobertura.xml \
+  --exclude "[ManagedCode.Orleans.Graph.Tests]*" \
+  --threshold 80 \
+  --threshold-type line \
+  --threshold-stat total
+```
 
 ## License
-MIT – see [LICENSE](LICENSE).
+
+MIT - see [LICENSE](LICENSE).

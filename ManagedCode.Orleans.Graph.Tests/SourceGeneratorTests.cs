@@ -1,12 +1,11 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using Xunit;
 
 namespace ManagedCode.Orleans.Graph.Tests;
 
 public class SourceGeneratorTests
 {
-    [Fact]
+    [Test]
     public void SourceGenerator_ReportsCycleDiagnostic()
     {
         const string source = @"using ManagedCode.Orleans.Graph;
@@ -45,7 +44,7 @@ public interface GrainB : IGrain { }
         GeneratorDriver driver = CSharpGeneratorDriver.Create(generator);
         driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out _, out var diagnostics);
 
-        Assert.Contains(diagnostics, d => d.Id == "GCB001");
+        diagnostics.ShouldContain(d => d.Id == "GCB001");
     }
 
     private static IEnumerable<MetadataReference> CreateReferences()

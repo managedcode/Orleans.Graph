@@ -1,13 +1,11 @@
-using System;
 using System.Reflection;
 using ManagedCode.Orleans.Graph.Filters;
 using ManagedCode.Orleans.Graph.Models;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Hosting;
 
 namespace ManagedCode.Orleans.Graph.Extensions;
 
-public static class OrleansCleintGraphExtensions
+public static class OrleansClientGraphExtensions
 {
     public static IClientBuilder AddOrleansGraph(this IClientBuilder builder) =>
         builder.AddOrleansGraph(null, null);
