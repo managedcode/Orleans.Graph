@@ -100,18 +100,18 @@ jobs:
           echo "$RESULT"
           OUTPUT="$OUTPUT$RESULT"
 
-          if [ $EXIT_CODE -eq 0 ]; then
+          if echo "$RESULT" | grep -qi "already exists"; then
+            echo "Package already exists, skipping..."
+          elif [ $EXIT_CODE -eq 0 ]; then
             echo "Successfully published $package"
             PUBLISHED=true
-          elif echo "$RESULT" | grep -q "already exists"; then
-            echo "Package already exists, skipping..."
           else
             echo "Failed to publish $package"
             exit 1
           fi
         done
 
-        if [ "$PUBLISHED" = true ] || echo "$OUTPUT" | grep -q "Your package was pushed"; then
+        if [ "$PUBLISHED" = true ]; then
           echo "published=true" >> $GITHUB_OUTPUT
           echo "At least one package was successfully published"
         else
