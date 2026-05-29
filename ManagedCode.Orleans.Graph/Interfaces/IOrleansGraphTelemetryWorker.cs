@@ -4,7 +4,7 @@ namespace ManagedCode.Orleans.Graph.Interfaces;
 
 public interface IOrleansGraphTelemetryWorker : IGrainWithStringKey
 {
-    Task RecordAsync(IReadOnlyCollection<ObservedGrainCallEdge> edges);
+    Task RecordAsync(IReadOnlyCollection<ObservedGrainCall> edges);
 
     Task FlushAsync();
 }

@@ -4,9 +4,9 @@ namespace ManagedCode.Orleans.Graph.Interfaces;
 
 public interface IOrleansGraphTelemetryGrain : IGrainWithStringKey
 {
-    Task MergeAsync(IReadOnlyCollection<ObservedGrainCallEdge> edges);
+    Task MergeAsync(IReadOnlyCollection<ObservedGrainCall> edges);
 
-    Task<IReadOnlyCollection<ObservedGrainCallEdge>> GetEdgesAsync();
+    Task<ObservedGrainCallGraph> GetObservedGraphAsync();
 
     Task<string> GenerateLiveMermaidDiagramAsync();
 

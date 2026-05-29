@@ -2,8 +2,8 @@ namespace ManagedCode.Orleans.Graph.Models;
 
 [Immutable]
 [GenerateSerializer]
-[Alias("MC.ObservedGrainCallEdge")]
-public sealed record ObservedGrainCallEdge(
+[Alias("MC.ObservedGrainCall")]
+public sealed record ObservedGrainCall(
     [property: Id(0)] string Source,
     [property: Id(1)] string Target,
     [property: Id(2)] string SourceMethod,
@@ -12,13 +12,13 @@ public sealed record ObservedGrainCallEdge(
     [property: Id(5)] DateTimeOffset FirstSeenUtc,
     [property: Id(6)] DateTimeOffset LastSeenUtc)
 {
-    public static ObservedGrainCallEdge Create(string source, string target, string sourceMethod, string targetMethod)
+    public static ObservedGrainCall Create(string source, string target, string sourceMethod, string targetMethod)
     {
         var now = DateTimeOffset.UtcNow;
-        return new ObservedGrainCallEdge(source, target, sourceMethod, targetMethod, 1, now, now);
+        return new ObservedGrainCall(source, target, sourceMethod, targetMethod, 1, now, now);
     }
 
-    public ObservedGrainCallEdge Merge(ObservedGrainCallEdge edge)
+    public ObservedGrainCall Merge(ObservedGrainCall edge)
     {
         if (!string.Equals(Source, edge.Source, StringComparison.Ordinal) ||
             !string.Equals(Target, edge.Target, StringComparison.Ordinal) ||

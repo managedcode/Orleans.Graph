@@ -7,18 +7,30 @@ public static class RequestContextHelper
 {
     public static bool TrackIncomingCall(this IIncomingGrainCallContext context)
     {
+        EnsureValidGrainIdentity(context.InterfaceName, context.MethodName);
+
         var call = context.GetCallHistory();
         call.Push(new InCall(context.SourceId, context.TargetId, context.InterfaceName, context.MethodName));
         context.SetCallHistory(call);
+        SetCurrentCaller(context.InterfaceName, context.MethodName);
         return true;
     }
 
     public static bool TrackOutgoingCall(this IOutgoingGrainCallContext context)
     {
+        EnsureValidGrainIdentity(context.InterfaceName, context.MethodName);
+
         var caller = ResolveCallerInterface(context);
+        var callerMethod = ResolveCallerMethod(context);
 
         var call = context.GetCallHistory();
-        call.Push(new OutCall(context.SourceId, context.TargetId, caller, context.InterfaceName, context.MethodName));
+        call.Push(new OutCall(
+            context.SourceId,
+            context.TargetId,
+            caller,
+            context.InterfaceName,
+            context.MethodName,
+            callerMethod));
         context.SetCallHistory(call);
         return true;
     }
@@ -67,6 +79,19 @@ public static class RequestContextHelper
     public static bool IsTelemetrySuppressed()
     {
         return RequestContext.Get(Constants.TelemetrySuppressionContextKey) is true;
+    }
+
+    public static (object? Caller, object? Method) CaptureCurrentCaller()
+    {
+        return (
+            RequestContext.Get(Constants.CurrentCallerInterfaceContextKey),
+            RequestContext.Get(Constants.CurrentCallerMethodContextKey));
+    }
+
+    public static void RestoreCurrentCaller((object? Caller, object? Method) currentCaller)
+    {
+        RestoreRequestContextValue(Constants.CurrentCallerInterfaceContextKey, currentCaller.Caller);
+        RestoreRequestContextValue(Constants.CurrentCallerMethodContextKey, currentCaller.Method);
     }
 
     public static async Task RunWithTelemetrySuppressedAsync(Func<Task> action)
@@ -120,56 +145,69 @@ public static class RequestContextHelper
             return Constants.ClientCallerId;
         }
 
-        var normalizedName = NormalizeGrainTypeName(context.SourceId.Value.Type.ToString() ?? string.Empty);
-
-        if (context.SourceContext?.GrainInstance is { } instance)
+        if (RequestContext.Get(Constants.CurrentCallerInterfaceContextKey) is string caller &&
+            IsValidGrainIdentity(caller))
         {
-            var grainInterfaces = instance.GetType()
-                .GetInterfaces()
-                .Where(i => typeof(IGrain).IsAssignableFrom(i))
-                .ToArray();
-
-            var directMatch = grainInterfaces.FirstOrDefault(i =>
-                string.Equals(i.FullName, normalizedName, StringComparison.Ordinal));
-
-            if (directMatch?.FullName is not null)
-            {
-                return directMatch.FullName;
-            }
-
-            var firstInterface = grainInterfaces
-                .OrderBy(i => i.FullName, StringComparer.Ordinal)
-                .FirstOrDefault();
-
-            if (firstInterface?.FullName is not null)
-            {
-                return firstInterface.FullName;
-            }
+            return caller;
         }
 
-        return normalizedName;
+        throw new InvalidOperationException(
+            $"Unable to resolve caller grain interface for outgoing call to {context.InterfaceName}.{context.MethodName}.");
     }
 
-    private static string NormalizeGrainTypeName(string grainType)
+    private static string ResolveCallerMethod(IOutgoingGrainCallContext context)
     {
-        if (string.IsNullOrWhiteSpace(grainType))
+        if (!context.SourceId.HasValue)
         {
-            return string.Empty;
+            return Constants.AnyMethod;
         }
 
-        var value = grainType.Trim();
-
-        var colonIndex = value.LastIndexOf(':');
-        if (colonIndex >= 0 && colonIndex < value.Length - 1)
+        if (RequestContext.Get(Constants.CurrentCallerMethodContextKey) is string method &&
+            !string.IsNullOrWhiteSpace(method))
         {
-            value = value[(colonIndex + 1)..].Trim();
+            return method;
         }
 
-        if (value.StartsWith('[') && value.EndsWith(']') && value.Length > 2)
+        throw new InvalidOperationException(
+            $"Unable to resolve caller grain method for outgoing call to {context.InterfaceName}.{context.MethodName}.");
+    }
+
+    private static void SetCurrentCaller(string caller, string method)
+    {
+        RequestContext.Set(Constants.CurrentCallerInterfaceContextKey, caller);
+        RequestContext.Set(Constants.CurrentCallerMethodContextKey, method);
+    }
+
+    private static void RestoreRequestContextValue(string key, object? value)
+    {
+        if (value is null)
         {
-            value = value[1..^1];
+            RequestContext.Remove(key);
+            return;
         }
 
-        return value;
+        RequestContext.Set(key, value);
+    }
+
+    private static void EnsureValidGrainIdentity(string grainType, string method)
+    {
+        if (IsValidGrainIdentity(grainType))
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"Resolved Orleans graph identity for {grainType}.{method} is not a concrete grain interface.");
+    }
+
+    private static bool IsBaseGrainType(string grainType)
+    {
+        return string.Equals(grainType, nameof(Grain), StringComparison.Ordinal) ||
+               string.Equals(grainType, typeof(Grain).FullName, StringComparison.Ordinal);
+    }
+
+    private static bool IsValidGrainIdentity(string grainType)
+    {
+        return !string.IsNullOrWhiteSpace(grainType) && !IsBaseGrainType(grainType);
     }
 }

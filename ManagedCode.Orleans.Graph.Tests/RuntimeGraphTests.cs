@@ -21,7 +21,7 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
             .GetGrain<IGrainA>("runtime")
             .MethodB1(1);
 
-        var edges = await WaitForEdgesAsync(_fixture.Cluster.Client, edges =>
+        var edges = await WaitForObservedCallsAsync(_fixture.Cluster.Client, edges =>
             edges.Any(edge =>
                 edge.Source == Constants.ClientCallerId &&
                 edge.Target == typeof(IGrainA).FullName &&
@@ -50,7 +50,7 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
     }
 
     [Test]
-    public async Task TelemetryWorker_FlushesObservedEdgesByTimerAsync()
+    public async Task TelemetryWorker_FlushesObservedCallsByTimerAsync()
     {
         await ResetTelemetryAsync(_fixture.Cluster.Client);
 
@@ -58,7 +58,7 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
             .GetGrain<IGrainA>("timer")
             .MethodB1(1);
 
-        var edges = await WaitForEdgesAsync(_fixture.Cluster.Client, edges =>
+        var edges = await WaitForObservedCallsAsync(_fixture.Cluster.Client, edges =>
             edges.Any(edge =>
                 edge.Source == typeof(IGrainA).FullName &&
                 edge.Target == typeof(IGrainB).FullName));
@@ -77,7 +77,7 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
         await grain.MethodB1(1);
         await grain.MethodB1(2);
 
-        var edges = await WaitForEdgesAsync(_fixture.Cluster.Client, edges =>
+        var edges = await WaitForObservedCallsAsync(_fixture.Cluster.Client, edges =>
             edges.Any(edge =>
                 edge.Source == Constants.ClientCallerId &&
                 edge.Target == typeof(IGrainA).FullName &&
@@ -110,7 +110,7 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
             .GetGrain<IGrainA>("diagram")
             .MethodB1(1);
 
-        await WaitForEdgesAsync(_fixture.Cluster.Client, edges =>
+        await WaitForObservedCallsAsync(_fixture.Cluster.Client, edges =>
             edges.Any(edge =>
                 edge.Source == Constants.ClientCallerId &&
                 edge.Target == typeof(IGrainA).FullName &&
@@ -134,6 +134,66 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
     }
 
     [Test]
+    public async Task TelemetryGrain_ReturnsObservedGraphVerticesAndEdgesAsync()
+    {
+        await ResetTelemetryAsync(_fixture.Cluster.Client);
+
+        await _fixture.Cluster.Client
+            .GetGrain<IGrainA>("observed-graph")
+            .MethodB1(1);
+
+        var observedGraph = await WaitForObservedGraphAsync(_fixture.Cluster.Client, graph =>
+            graph.Vertices.Any(vertex => vertex.Id == Constants.ClientCallerId) &&
+            graph.Vertices.Any(vertex => vertex.Id == typeof(IGrainA).FullName) &&
+            graph.Vertices.Any(vertex => vertex.Id == typeof(IGrainB).FullName) &&
+            graph.Edges.Any(edge =>
+                edge.Source == Constants.ClientCallerId &&
+                edge.Target == typeof(IGrainA).FullName &&
+                edge.SourceMethod == Constants.AnyMethod &&
+                edge.TargetMethod == nameof(IGrainA.MethodB1)) &&
+            graph.Edges.Any(edge =>
+                edge.Source == typeof(IGrainA).FullName &&
+                edge.Target == typeof(IGrainB).FullName &&
+                edge.SourceMethod == nameof(IGrainA.MethodB1) &&
+                edge.TargetMethod == nameof(IGrainB.MethodB1)));
+
+        observedGraph.Vertices.Count.ShouldBe(3);
+        observedGraph.Edges.Count.ShouldBe(2);
+        observedGraph.Vertices.ShouldContain(vertex =>
+            vertex.Id == typeof(IGrainA).FullName &&
+            vertex.DisplayName == nameof(IGrainA));
+    }
+
+    [Test]
+    public async Task AllowAll_RecordsGrainInterfacesInsteadOfBaseGrainAsync()
+    {
+        await ResetTelemetryAsync(_fixture.Cluster.Client);
+
+        await _fixture.Cluster.Client
+            .GetGrain<IGrainA>("concrete-class-names")
+            .MethodB1(1);
+
+        var edges = await WaitForObservedCallsAsync(_fixture.Cluster.Client, edges =>
+            edges.Any(edge =>
+                edge.Source == typeof(IGrainA).FullName &&
+                edge.Target == typeof(IGrainB).FullName &&
+                edge.SourceMethod == nameof(IGrainA.MethodB1) &&
+                edge.TargetMethod == nameof(IGrainB.MethodB1)));
+
+        edges.ShouldContain(edge =>
+            edge.Source == typeof(IGrainA).FullName &&
+            edge.Target == typeof(IGrainB).FullName);
+        edges.Any(IsBaseGrainEdge).ShouldBeFalse();
+
+        var telemetry = _fixture.Cluster.Client.GetGrain<IOrleansGraphTelemetryGrain>(Constants.LiveGraphTelemetryGrainKey);
+        var diagram = await telemetry.GenerateLiveMermaidDiagramAsync();
+
+        diagram.ShouldContain("[\"IGrainA\"]");
+        diagram.ShouldContain("[\"IGrainB\"]");
+        diagram.ShouldNotContain("[\"Grain\"]");
+    }
+
+    [Test]
     public async Task AllowAll_BuildsExactComplexRuntimeGraphAsync()
     {
         await ResetTelemetryAsync(_fixture.Cluster.Client);
@@ -146,10 +206,10 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
 
         var expectedEdges = BuildExpectedComplexFlowEdges(nameof(IGrainA.MethodComplexFlow), includeClient: true);
 
-        var edges = await WaitForEdgesAsync(_fixture.Cluster.Client, edges =>
-            edges.Count == expectedEdges.Length && ContainsExpectedEdges(edges, expectedEdges));
+        var edges = await WaitForObservedCallsAsync(_fixture.Cluster.Client, edges =>
+            edges.Count == expectedEdges.Length && ContainsExpectedCalls(edges, expectedEdges));
 
-        AssertExpectedEdges(edges, expectedEdges);
+        AssertExpectedCalls(edges, expectedEdges);
         edges.Any(IsTelemetryEdge).ShouldBeFalse();
 
         var telemetry = _fixture.Cluster.Client.GetGrain<IOrleansGraphTelemetryGrain>(Constants.LiveGraphTelemetryGrainKey);
@@ -171,10 +231,10 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
 
         var expectedEdges = BuildExpectedComplexFlowEdges(nameof(IGrainA.MethodGrainOnlyComplexFlow), includeClient: false);
 
-        var edges = await WaitForEdgesAsync(_fixture.Cluster.Client, edges =>
-            edges.Count == expectedEdges.Length && ContainsExpectedEdges(edges, expectedEdges));
+        var edges = await WaitForObservedCallsAsync(_fixture.Cluster.Client, edges =>
+            edges.Count == expectedEdges.Length && ContainsExpectedCalls(edges, expectedEdges));
 
-        AssertExpectedEdges(edges, expectedEdges);
+        AssertExpectedCalls(edges, expectedEdges);
         edges.Any(edge => edge.Source == Constants.ClientCallerId || edge.Target == Constants.ClientCallerId).ShouldBeFalse();
         edges.Any(IsTelemetryEdge).ShouldBeFalse();
 
@@ -197,10 +257,10 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
         result.ShouldBe(5);
 
         var expectedEdges = BuildExpectedComplexFlowEdges(nameof(IGrainA.MethodGrainOnlyComplexFlow), includeClient: false);
-        var edges = await WaitForEdgesAsync(grainFactory, edges =>
-            edges.Count == expectedEdges.Length && ContainsExpectedEdges(edges, expectedEdges));
+        var edges = await WaitForObservedCallsAsync(grainFactory, edges =>
+            edges.Count == expectedEdges.Length && ContainsExpectedCalls(edges, expectedEdges));
 
-        AssertExpectedEdges(edges, expectedEdges);
+        AssertExpectedCalls(edges, expectedEdges);
         edges.Any(edge => edge.Source == Constants.ClientCallerId || edge.Target == Constants.ClientCallerId).ShouldBeFalse();
         edges.Any(IsTelemetryEdge).ShouldBeFalse();
 
@@ -219,7 +279,7 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
             .GetGrain<IGrainA>("internal-default")
             .MethodB1(1);
 
-        var edges = await WaitForEdgesAsync(_fixture.Cluster.Client, edges =>
+        var edges = await WaitForObservedCallsAsync(_fixture.Cluster.Client, edges =>
             edges.Any(edge =>
                 edge.Source == typeof(IGrainA).FullName &&
                 edge.Target == typeof(IGrainB).FullName));
@@ -240,29 +300,37 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
         await grainFactory.GetGrain<IOrleansGraphTelemetryGrain>(Constants.LiveGraphTelemetryGrainKey).ClearAsync();
     }
 
-    private static async Task<IReadOnlyCollection<ObservedGrainCallEdge>> WaitForEdgesAsync(
+    private static async Task<IReadOnlyCollection<ObservedGrainCall>> WaitForObservedCallsAsync(
         IGrainFactory grainFactory,
-        Func<IReadOnlyCollection<ObservedGrainCallEdge>, bool> predicate)
+        Func<IReadOnlyCollection<ObservedGrainCall>, bool> predicate)
+    {
+        var graph = await WaitForObservedGraphAsync(grainFactory, graph => predicate(graph.Edges));
+        return graph.Edges;
+    }
+
+    private static async Task<ObservedGrainCallGraph> WaitForObservedGraphAsync(
+        IGrainFactory grainFactory,
+        Func<ObservedGrainCallGraph, bool> predicate)
     {
         var telemetry = grainFactory.GetGrain<IOrleansGraphTelemetryGrain>(Constants.LiveGraphTelemetryGrainKey);
 
         for (var attempt = 0; attempt < 50; attempt++)
         {
-            var edges = await telemetry.GetEdgesAsync();
-            if (predicate(edges))
+            var graph = await telemetry.GetObservedGraphAsync();
+            if (predicate(graph))
             {
-                return edges;
+                return graph;
             }
 
             await Task.Delay(100);
         }
 
-        return await telemetry.GetEdgesAsync();
+        return await telemetry.GetObservedGraphAsync();
     }
 
-    private static void AssertExpectedEdges(
-        IReadOnlyCollection<ObservedGrainCallEdge> edges,
-        IReadOnlyCollection<ExpectedObservedEdge> expectedEdges)
+    private static void AssertExpectedCalls(
+        IReadOnlyCollection<ObservedGrainCall> edges,
+        IReadOnlyCollection<ExpectedObservedCall> expectedEdges)
     {
         edges.Count.ShouldBe(expectedEdges.Count);
 
@@ -277,9 +345,9 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
         }
     }
 
-    private static bool ContainsExpectedEdges(
-        IReadOnlyCollection<ObservedGrainCallEdge> edges,
-        IReadOnlyCollection<ExpectedObservedEdge> expectedEdges)
+    private static bool ContainsExpectedCalls(
+        IReadOnlyCollection<ObservedGrainCall> edges,
+        IReadOnlyCollection<ExpectedObservedCall> expectedEdges)
     {
         return expectedEdges.All(expected =>
             edges.Any(edge =>
@@ -290,9 +358,9 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
                 edge.Count == expected.Count));
     }
 
-    private static ExpectedObservedEdge[] BuildExpectedComplexFlowEdges(string rootMethod, bool includeClient)
+    private static ExpectedObservedCall[] BuildExpectedComplexFlowEdges(string rootMethod, bool includeClient)
     {
-        var edges = new List<ExpectedObservedEdge>
+        var edges = new List<ExpectedObservedCall>
         {
             new(
                 typeof(IGrainA).FullName!,
@@ -334,7 +402,7 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
 
         if (includeClient)
         {
-            edges.Insert(0, new ExpectedObservedEdge(
+            edges.Insert(0, new ExpectedObservedCall(
                 Constants.ClientCallerId,
                 typeof(IGrainA).FullName!,
                 Constants.AnyMethod,
@@ -378,9 +446,20 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
         return (typeof(TGrain).FullName!.Replace('.', '_'), typeof(TGrain).Name);
     }
 
-    private static bool IsTelemetryEdge(ObservedGrainCallEdge edge)
+    private static bool IsTelemetryEdge(ObservedGrainCall edge)
     {
         return IsTelemetryEndpoint(edge.Source) || IsTelemetryEndpoint(edge.Target);
+    }
+
+    private static bool IsBaseGrainEdge(ObservedGrainCall edge)
+    {
+        return IsBaseGrainEndpoint(edge.Source) || IsBaseGrainEndpoint(edge.Target);
+    }
+
+    private static bool IsBaseGrainEndpoint(string endpoint)
+    {
+        return string.Equals(endpoint, nameof(Grain), StringComparison.Ordinal) ||
+               string.Equals(endpoint, typeof(Grain).FullName, StringComparison.Ordinal);
     }
 
     private static bool IsTelemetryEndpoint(string endpoint)
@@ -389,7 +468,7 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
                endpoint.Contains(nameof(IOrleansGraphTelemetryGrain), StringComparison.Ordinal);
     }
 
-    private readonly record struct ExpectedObservedEdge(
+    private readonly record struct ExpectedObservedCall(
         string Source,
         string Target,
         string SourceMethod,

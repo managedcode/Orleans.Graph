@@ -5,7 +5,7 @@ namespace ManagedCode.Orleans.Graph.Telemetry;
 
 public sealed class OrleansGraphTelemetryGrain : Grain, IOrleansGraphTelemetryGrain, IObservedGrainCallSink
 {
-    private readonly Dictionary<ObservedGrainCallKey, ObservedGrainCallEdge> _edges = new();
+    private readonly Dictionary<ObservedGrainCallKey, ObservedGrainCall> _edges = new();
 
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
@@ -13,29 +13,23 @@ public sealed class OrleansGraphTelemetryGrain : Grain, IOrleansGraphTelemetryGr
         return Task.CompletedTask;
     }
 
-    public Task MergeAsync(IReadOnlyCollection<ObservedGrainCallEdge> edges)
+    public Task MergeAsync(IReadOnlyCollection<ObservedGrainCall> edges)
     {
         ArgumentNullException.ThrowIfNull(edges);
 
-        RecordObservedEdges(edges);
+        RecordObservedCalls(edges);
         return Task.CompletedTask;
     }
 
-    public Task<IReadOnlyCollection<ObservedGrainCallEdge>> GetEdgesAsync()
+    public Task<ObservedGrainCallGraph> GetObservedGraphAsync()
     {
-        var snapshot = _edges.Values
-            .OrderBy(static edge => edge.Source, StringComparer.Ordinal)
-            .ThenBy(static edge => edge.Target, StringComparer.Ordinal)
-            .ThenBy(static edge => edge.SourceMethod, StringComparer.Ordinal)
-            .ThenBy(static edge => edge.TargetMethod, StringComparer.Ordinal)
-            .ToArray();
-
-        return Task.FromResult<IReadOnlyCollection<ObservedGrainCallEdge>>(snapshot);
+        return Task.FromResult(GrainTransitionManager.BuildObservedGraph(_edges.Values));
     }
 
     public Task<string> GenerateLiveMermaidDiagramAsync()
     {
-        return Task.FromResult(GrainTransitionManager.GenerateObservedMermaidDiagram(_edges.Values));
+        var observedGraph = GrainTransitionManager.BuildObservedGraph(_edges.Values);
+        return Task.FromResult(GrainTransitionManager.GenerateObservedGraphMermaidDiagram(observedGraph));
     }
 
     public Task ClearAsync()
@@ -44,7 +38,7 @@ public sealed class OrleansGraphTelemetryGrain : Grain, IOrleansGraphTelemetryGr
         return Task.CompletedTask;
     }
 
-    public void RecordObservedEdges(IReadOnlyCollection<ObservedGrainCallEdge> edges)
+    public void RecordObservedCalls(IReadOnlyCollection<ObservedGrainCall> edges)
     {
         foreach (var edge in edges)
         {

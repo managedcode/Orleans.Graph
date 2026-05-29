@@ -13,32 +13,45 @@ public class GraphIncomingGrainCallFilter(IServiceProvider serviceProvider, Grap
 
     public async Task Invoke(IIncomingGrainCallContext context)
     {
-        if (context.TrackIncomingCall(graphCallFilterConfig))
+        var currentCaller = RequestContextHelper.CaptureCurrentCaller();
+        var tracked = context.TrackIncomingCall(graphCallFilterConfig);
+
+        try
         {
-            if (!context.IsOrleansGraphTelemetryCall())
+            if (tracked)
             {
-                GraphManager?.IsTransitionAllowed(context.GetCallHistory(), true);
-                GraphManager?.DetectDeadlocks(context.GetCallHistory(), true);
+                if (!context.IsOrleansGraphTelemetryCall())
+                {
+                    GraphManager?.IsTransitionAllowed(context.GetCallHistory(), true);
+                    GraphManager?.DetectDeadlocks(context.GetCallHistory(), true);
+                }
+
+                await ReportObservedEdgeAsync(context);
             }
 
-            await ReportObservedEdgeAsync(context);
+            await context.Invoke();
         }
-
-        await context.Invoke();
+        finally
+        {
+            if (tracked)
+            {
+                RequestContextHelper.RestoreCurrentCaller(currentCaller);
+            }
+        }
     }
 
     private async Task ReportObservedEdgeAsync(IIncomingGrainCallContext context)
     {
-        var observedEdge = GrainTransitionManager.GetLatestObservedEdge(context.GetCallHistory());
+        var observedEdge = GrainTransitionManager.GetLatestObservedCall(context.GetCallHistory());
         if (observedEdge is null)
         {
             return;
         }
 
-        var observedEdges = new[] { observedEdge };
+        var observedCalls = new[] { observedEdge };
         if (context.Grain is IObservedGrainCallSink sink && context.IsOrleansGraphTelemetryCall())
         {
-            sink.RecordObservedEdges(observedEdges);
+            sink.RecordObservedCalls(observedCalls);
             return;
         }
 
@@ -55,6 +68,6 @@ public class GraphIncomingGrainCallFilter(IServiceProvider serviceProvider, Grap
         await RequestContextHelper.RunWithTelemetrySuppressedAsync(() =>
             GrainFactory
                 .GetGrain<IOrleansGraphTelemetryWorker>(Constants.LiveGraphTelemetryGrainKey)
-                .RecordAsync(observedEdges));
+                .RecordAsync(observedCalls));
     }
 }

@@ -87,7 +87,7 @@ After your app receives traffic, read the observed graph from the telemetry grai
 ```csharp
 var telemetry = grainFactory.GetGrain<IOrleansGraphTelemetryGrain>(Constants.LiveGraphTelemetryGrainKey);
 
-var observedEdges = await telemetry.GetEdgesAsync();
+var observedGraph = await telemetry.GetObservedGraphAsync();
 var liveMermaidDiagram = await telemetry.GenerateLiveMermaidDiagramAsync();
 ```
 
@@ -131,9 +131,11 @@ var liveDiagram = manager.GenerateLiveMermaidDiagram(callHistory);
 
 ```csharp
 var telemetry = grainFactory.GetGrain<IOrleansGraphTelemetryGrain>(Constants.LiveGraphTelemetryGrainKey);
-var liveEdges = await telemetry.GetEdgesAsync();
-var liveGraph = await telemetry.GenerateLiveMermaidDiagramAsync();
+var liveGraph = await telemetry.GetObservedGraphAsync();
+var liveMermaidGraph = await telemetry.GenerateLiveMermaidDiagramAsync();
 ```
+
+`liveGraph.Vertices` contains grain identities. `liveGraph.Edges` contains observed runtime transitions between those vertices, including `SourceMethod`, `TargetMethod`, hit count, and timestamps. The Mermaid API renders the same graph for visualization.
 
 Inspect the configured policy without parsing Mermaid.
 

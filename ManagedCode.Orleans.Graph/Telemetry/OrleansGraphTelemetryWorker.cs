@@ -9,7 +9,7 @@ namespace ManagedCode.Orleans.Graph.Telemetry;
 public sealed class OrleansGraphTelemetryWorker(GraphCallFilterConfig graphCallFilterConfig) : Grain, IOrleansGraphTelemetryWorker, IObservedGrainCallSink
 {
     private static readonly TimeSpan _defaultFlushPeriod = TimeSpan.FromSeconds(1);
-    private readonly Dictionary<ObservedGrainCallKey, ObservedGrainCallEdge> _edges = new();
+    private readonly Dictionary<ObservedGrainCallKey, ObservedGrainCall> _edges = new();
 
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
@@ -30,11 +30,11 @@ public sealed class OrleansGraphTelemetryWorker(GraphCallFilterConfig graphCallF
         return Task.CompletedTask;
     }
 
-    public Task RecordAsync(IReadOnlyCollection<ObservedGrainCallEdge> edges)
+    public Task RecordAsync(IReadOnlyCollection<ObservedGrainCall> edges)
     {
         ArgumentNullException.ThrowIfNull(edges);
 
-        RecordObservedEdges(edges);
+        RecordObservedCalls(edges);
         return Task.CompletedTask;
     }
 
@@ -57,12 +57,12 @@ public sealed class OrleansGraphTelemetryWorker(GraphCallFilterConfig graphCallF
         }
         catch
         {
-            RecordObservedEdges(snapshot);
+            RecordObservedCalls(snapshot);
             throw;
         }
     }
 
-    public void RecordObservedEdges(IReadOnlyCollection<ObservedGrainCallEdge> edges)
+    public void RecordObservedCalls(IReadOnlyCollection<ObservedGrainCall> edges)
     {
         foreach (var edge in edges)
         {

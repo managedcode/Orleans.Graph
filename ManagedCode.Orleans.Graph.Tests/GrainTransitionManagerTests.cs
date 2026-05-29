@@ -1,5 +1,6 @@
 using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
+using ManagedCode.Orleans.Graph.Tests.Cluster.Grains;
 using ManagedCode.Orleans.Graph.Tests.Cluster.Grains.Interfaces;
 
 namespace ManagedCode.Orleans.Graph.Tests;
@@ -136,14 +137,14 @@ public class GrainTransitionManagerTests
         var callHistory = new CallHistory();
         callHistory.Push(new OutCall(null, grainAId, Constants.ClientCallerId, typeof(IGrainA).FullName!, nameof(IGrainA.MethodB2)));
         callHistory.Push(new InCall(null, grainAId, typeof(IGrainA).FullName!, nameof(IGrainA.MethodB2)));
-        callHistory.Push(new OutCall(grainAId, grainBId, typeof(IGrainA).FullName!, typeof(IGrainB).FullName!, nameof(IGrainB.MethodC2)));
+        callHistory.Push(new OutCall(grainAId, grainBId, typeof(IGrainA).FullName!, typeof(IGrainB).FullName!, nameof(IGrainB.MethodC2), nameof(IGrainA.MethodB2)));
         callHistory.Push(new InCall(grainAId, grainBId, typeof(IGrainB).FullName!, nameof(IGrainB.MethodC2)));
 
         graph.IsTransitionAllowed(callHistory).ShouldBeTrue();
     }
 
     [Test]
-    public void GetObservedEdges_ReturnsClientAndNestedGrainEdges()
+    public void GetObservedGraph_ReturnsVerticesAndClientAndNestedGrainEdges()
     {
         var grainAId = GrainId.Create("graina", "observed");
         var grainBId = GrainId.Create("grainb", "observed");
@@ -151,11 +152,16 @@ public class GrainTransitionManagerTests
         var callHistory = new CallHistory();
         callHistory.Push(new OutCall(null, grainAId, Constants.ClientCallerId, typeof(IGrainA).FullName!, nameof(IGrainA.MethodB1)));
         callHistory.Push(new InCall(null, grainAId, typeof(IGrainA).FullName!, nameof(IGrainA.MethodB1)));
-        callHistory.Push(new OutCall(grainAId, grainBId, typeof(IGrainA).FullName!, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1)));
+        callHistory.Push(new OutCall(grainAId, grainBId, typeof(IGrainA).FullName!, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1), nameof(IGrainA.MethodB1)));
         callHistory.Push(new InCall(grainAId, grainBId, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1)));
 
-        var edges = GrainTransitionManager.GetObservedEdges(callHistory);
+        var graph = GrainTransitionManager.GetObservedGraph(callHistory);
+        var edges = graph.Edges;
 
+        graph.Vertices.Count.ShouldBe(3);
+        graph.Vertices.ShouldContain(vertex => vertex.Id == Constants.ClientCallerId);
+        graph.Vertices.ShouldContain(vertex => vertex.Id == typeof(IGrainA).FullName);
+        graph.Vertices.ShouldContain(vertex => vertex.Id == typeof(IGrainB).FullName);
         edges.Count.ShouldBe(2);
         edges.ShouldContain(edge =>
             edge.Source == Constants.ClientCallerId &&
@@ -172,7 +178,7 @@ public class GrainTransitionManagerTests
     }
 
     [Test]
-    public void GetLatestObservedEdge_ReturnsCurrentIncomingPair()
+    public void GetLatestObservedCall_ReturnsCurrentIncomingPair()
     {
         var grainAId = GrainId.Create("graina", "latest");
         var grainBId = GrainId.Create("grainb", "latest");
@@ -180,16 +186,39 @@ public class GrainTransitionManagerTests
         var callHistory = new CallHistory();
         callHistory.Push(new OutCall(null, grainAId, Constants.ClientCallerId, typeof(IGrainA).FullName!, nameof(IGrainA.MethodB1)));
         callHistory.Push(new InCall(null, grainAId, typeof(IGrainA).FullName!, nameof(IGrainA.MethodB1)));
-        callHistory.Push(new OutCall(grainAId, grainBId, typeof(IGrainA).FullName!, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1)));
+        callHistory.Push(new OutCall(grainAId, grainBId, typeof(IGrainA).FullName!, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1), nameof(IGrainA.MethodB1)));
         callHistory.Push(new InCall(grainAId, grainBId, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1)));
 
-        var edge = GrainTransitionManager.GetLatestObservedEdge(callHistory);
+        var edge = GrainTransitionManager.GetLatestObservedCall(callHistory);
 
         edge.ShouldNotBeNull();
         edge.Source.ShouldBe(typeof(IGrainA).FullName);
         edge.Target.ShouldBe(typeof(IGrainB).FullName);
         edge.SourceMethod.ShouldBe(nameof(IGrainA.MethodB1));
         edge.TargetMethod.ShouldBe(nameof(IGrainB.MethodB1));
+    }
+
+    [Test]
+    public void GetObservedGraph_RejectsBaseGrainIdentity()
+    {
+        var grainAId = GrainId.Create("graina", "concrete-implementation");
+
+        var callHistory = new CallHistory();
+        callHistory.Push(new OutCall(
+            null,
+            grainAId,
+            Constants.ClientCallerId,
+            typeof(Grain).FullName!,
+            nameof(IGrainA.MethodB1)));
+        callHistory.Push(new InCall(
+            null,
+            grainAId,
+            typeof(Grain).FullName!,
+            nameof(IGrainA.MethodB1)));
+
+        var exception = Should.Throw<InvalidOperationException>(() => GrainTransitionManager.GetObservedGraph(callHistory));
+
+        exception.Message.ShouldContain("base Grain");
     }
 
     [Test]
@@ -478,7 +507,7 @@ public class GrainTransitionManagerTests
     }
 
     [Test]
-    public void GenerateLiveMermaidDiagram_RendersObservedEdgesWithoutPolicyEdges()
+    public void GenerateLiveMermaidDiagram_RendersObservedCallsWithoutPolicyEdges()
     {
         var graph = GrainCallsBuilder.Create()
             .AllowAll()
@@ -497,23 +526,24 @@ public class GrainTransitionManagerTests
     }
 
     [Test]
-    public void GenerateObservedMermaidDiagram_RendersObservedOnlyMethodLabelsAndUsageCounts()
+    public void GenerateObservedGraphMermaidDiagram_RendersObservedOnlyMethodLabelsAndUsageCounts()
     {
         var edges = new[]
         {
-            ObservedGrainCallEdge.Create(
+            ObservedGrainCall.Create(
                 typeof(IGrainA).FullName!,
                 typeof(IGrainB).FullName!,
                 nameof(IGrainA.MethodA1),
                 nameof(IGrainB.MethodB1)),
-            ObservedGrainCallEdge.Create(
+            ObservedGrainCall.Create(
                 typeof(IGrainA).FullName!,
                 typeof(IGrainB).FullName!,
                 nameof(IGrainA.MethodB1),
                 nameof(IGrainB.MethodC2))
         };
 
-        var diagram = GrainTransitionManager.GenerateObservedMermaidDiagram(edges);
+        var graph = GrainTransitionManager.BuildObservedGraph(edges);
+        var diagram = GrainTransitionManager.GenerateObservedGraphMermaidDiagram(graph);
 
         diagram.ShouldContain("graph LR");
         diagram.ShouldContain("IGrainA");

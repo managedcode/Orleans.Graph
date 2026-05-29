@@ -32,6 +32,8 @@ Update guidelines:
 - **Call Tracking**: Resolve outgoing call identities from the Orleans context (`SourceId`/interface metadata) instead of guessing via reflection order to avoid mislabelling callers.
 - **Configuration Flags**: Treat `AllowAll`/`DisallowAll` on `GrainCallsBuilder` as authoritative defaults; ensure runtime checks respect the builder’s chosen baseline before reporting violations.
 - **Runtime Graph Telemetry**: For live graph features, have filters report observed calls to stateless worker aggregators that periodically flush to an in-memory grain; do not rely on per-request `CallHistory` alone for a global runtime graph.
+- **Runtime Graph Identity**: Live graph nodes must never silently fall back to the Orleans base `Grain` type or any guessed identity; use a concrete grain implementation class or a real grain interface, and fail fast if neither can be resolved.
+- **Runtime Graph API Shape**: Expose live telemetry as a graph model with explicit `Vertices` and `Edges`; Mermaid output is only a renderer for that same graph, while methods/counts/timestamps belong on edges.
 - **Telemetry Filtering**: Do not track Orleans.Graph internal telemetry calls by default; expose a configuration switch to include them, and test both filtered and full-tracking modes.
 - **Testing Scope**: Exercise new behavior through the Orleans-hosted integration tests in `ManagedCode.Orleans.Graph.Tests`, covering both positive and negative paths to mirror real cluster flows.
 - **Cluster-to-Cluster Tests**: For grain-only runtime graph scenarios, add coverage that starts from a silo-side `IGrainFactory` instead of `IClusterClient`, so client-origin edges cannot hide cluster-to-cluster behavior.

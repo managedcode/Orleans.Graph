@@ -4,5 +4,5 @@ namespace ManagedCode.Orleans.Graph.Telemetry;
 
 internal interface IObservedGrainCallSink
 {
-    void RecordObservedEdges(IReadOnlyCollection<ObservedGrainCallEdge> edges);
+    void RecordObservedCalls(IReadOnlyCollection<ObservedGrainCall> edges);
 }
