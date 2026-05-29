@@ -33,7 +33,7 @@ public sealed class OrleansGraphTelemetryGrain : Grain, IOrleansGraphTelemetryGr
         return Task.FromResult<IReadOnlyCollection<ObservedGrainCallEdge>>(snapshot);
     }
 
-    public Task<string> GenerateMermaidDiagramAsync()
+    public Task<string> GenerateLiveMermaidDiagramAsync()
     {
         return Task.FromResult(GrainTransitionManager.GenerateObservedMermaidDiagram(_edges.Values));
     }

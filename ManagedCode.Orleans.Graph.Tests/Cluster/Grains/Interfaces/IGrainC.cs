@@ -4,4 +4,5 @@ public interface IGrainC : IGrainWithStringKey
 {
     Task<int> MethodC1(int input);
     Task<int> MethodA2(int input);
+    Task<int> MethodBranchingFlow(int input);
 }

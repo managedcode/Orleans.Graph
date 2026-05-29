@@ -88,7 +88,7 @@ After your app receives traffic, read the observed graph from the telemetry grai
 var telemetry = grainFactory.GetGrain<IOrleansGraphTelemetryGrain>(Constants.LiveGraphTelemetryGrainKey);
 
 var observedEdges = await telemetry.GetEdgesAsync();
-var liveMermaidDiagram = await telemetry.GenerateMermaidDiagramAsync();
+var liveMermaidDiagram = await telemetry.GenerateLiveMermaidDiagramAsync();
 ```
 
 `AllowAll()` is not required for live telemetry. It only changes enforcement behavior: missing transitions are allowed instead of blocked. Orleans.Graph internal telemetry calls are excluded by default so the graph shows application traffic. Set `TrackOrleansGraphInternalCalls = true` only when debugging the telemetry pipeline itself.
@@ -132,7 +132,7 @@ var liveDiagram = manager.GenerateLiveMermaidDiagram(callHistory);
 ```csharp
 var telemetry = grainFactory.GetGrain<IOrleansGraphTelemetryGrain>(Constants.LiveGraphTelemetryGrainKey);
 var liveEdges = await telemetry.GetEdgesAsync();
-var liveGraph = await telemetry.GenerateMermaidDiagramAsync();
+var liveGraph = await telemetry.GenerateLiveMermaidDiagramAsync();
 ```
 
 Inspect the configured policy without parsing Mermaid.

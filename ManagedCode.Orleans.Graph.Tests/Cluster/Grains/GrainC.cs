@@ -14,4 +14,14 @@ public class GrainC : Grain, IGrainC
         return await GrainFactory.GetGrain<IGrainA>(this.GetPrimaryKeyString())
             .MethodA1(input);
     }
+
+    public async Task<int> MethodBranchingFlow(int input)
+    {
+        var grainKey = this.GetPrimaryKeyString();
+        var fromB = await GrainFactory.GetGrain<IGrainB>(grainKey)
+            .MethodB1(input);
+
+        return await GrainFactory.GetGrain<IGrainD>(grainKey)
+            .MethodE2(fromB);
+    }
 }

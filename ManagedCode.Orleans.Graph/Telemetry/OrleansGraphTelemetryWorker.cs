@@ -8,14 +8,14 @@ namespace ManagedCode.Orleans.Graph.Telemetry;
 [StatelessWorker(1)]
 public sealed class OrleansGraphTelemetryWorker(GraphCallFilterConfig graphCallFilterConfig) : Grain, IOrleansGraphTelemetryWorker, IObservedGrainCallSink
 {
-    private static readonly TimeSpan DefaultFlushPeriod = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan _defaultFlushPeriod = TimeSpan.FromSeconds(1);
     private readonly Dictionary<ObservedGrainCallKey, ObservedGrainCallEdge> _edges = new();
 
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
         var flushPeriod = graphCallFilterConfig.LiveGraphFlushPeriod > TimeSpan.Zero
             ? graphCallFilterConfig.LiveGraphFlushPeriod
-            : DefaultFlushPeriod;
+            : _defaultFlushPeriod;
 
         this.RegisterGrainTimer(
             FlushTimerAsync,

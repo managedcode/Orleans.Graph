@@ -8,7 +8,7 @@ public interface IOrleansGraphTelemetryGrain : IGrainWithStringKey
 
     Task<IReadOnlyCollection<ObservedGrainCallEdge>> GetEdgesAsync();
 
-    Task<string> GenerateMermaidDiagramAsync();
+    Task<string> GenerateLiveMermaidDiagramAsync();
 
     Task ClearAsync();
 }

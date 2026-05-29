@@ -71,6 +71,8 @@ public static class RequestContextHelper
 
     public static async Task RunWithTelemetrySuppressedAsync(Func<Task> action)
     {
+        ArgumentNullException.ThrowIfNull(action);
+
         var previous = RequestContext.Get(Constants.TelemetrySuppressionContextKey);
         RequestContext.Set(Constants.TelemetrySuppressionContextKey, true);
 

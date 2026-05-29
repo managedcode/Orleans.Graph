@@ -34,6 +34,7 @@ Update guidelines:
 - **Runtime Graph Telemetry**: For live graph features, have filters report observed calls to stateless worker aggregators that periodically flush to an in-memory grain; do not rely on per-request `CallHistory` alone for a global runtime graph.
 - **Telemetry Filtering**: Do not track Orleans.Graph internal telemetry calls by default; expose a configuration switch to include them, and test both filtered and full-tracking modes.
 - **Testing Scope**: Exercise new behavior through the Orleans-hosted integration tests in `ManagedCode.Orleans.Graph.Tests`, covering both positive and negative paths to mirror real cluster flows.
+- **Cluster-to-Cluster Tests**: For grain-only runtime graph scenarios, add coverage that starts from a silo-side `IGrainFactory` instead of `IClusterClient`, so client-origin edges cannot hide cluster-to-cluster behavior.
 - **Test Framework**: Use TUnit for tests and Shouldly for assertions; do not introduce FluentAssertions, so the test style stays aligned with the newer ManagedCode Orleans projects.
 - **Migration Releases**: For major framework/package migrations, complete three strict code-review-and-fix iterations before README polish, feature additions, commit, push, and CI verification, so release branches are hardened before publication.
 - **Code Style**: Use enums or constants over magic literals, keep documentation and comments in English, and avoid template placeholders—name files and types for their real domain roles.
