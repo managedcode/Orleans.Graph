@@ -1,6 +1,5 @@
 using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
-using ManagedCode.Orleans.Graph.Tests.Cluster.Grains;
 using ManagedCode.Orleans.Graph.Tests.Cluster.Grains.Interfaces;
 
 namespace ManagedCode.Orleans.Graph.Tests;
@@ -135,12 +134,84 @@ public class GrainTransitionManagerTests
         var grainBId = GrainId.Create("grainb", "source-method");
 
         var callHistory = new CallHistory();
-        callHistory.Push(new OutCall(null, grainAId, Constants.ClientCallerId, typeof(IGrainA).FullName!, nameof(IGrainA.MethodB2)));
+        callHistory.Push(new OutCall(null, grainAId, Constants.ClientCallerId, typeof(IGrainA).FullName!, nameof(IGrainA.MethodB2), Constants.AnyMethod));
         callHistory.Push(new InCall(null, grainAId, typeof(IGrainA).FullName!, nameof(IGrainA.MethodB2)));
         callHistory.Push(new OutCall(grainAId, grainBId, typeof(IGrainA).FullName!, typeof(IGrainB).FullName!, nameof(IGrainB.MethodC2), nameof(IGrainA.MethodB2)));
         callHistory.Push(new InCall(grainAId, grainBId, typeof(IGrainB).FullName!, nameof(IGrainB.MethodC2)));
 
         graph.IsTransitionAllowed(callHistory).ShouldBeTrue();
+    }
+
+    [Test]
+    public void IsLatestTransitionAllowed_ClientOutgoingWithoutIncoming_DoesNotEnforceClientSideGraph()
+    {
+        var graph = GrainCallsBuilder.Create()
+            .Build();
+
+        var callHistory = new CallHistory();
+        callHistory.Push(new OutCall(
+            null,
+            GrainId.Create("graina", "client-side"),
+            Constants.ClientCallerId,
+            typeof(IGrainA).FullName!,
+            nameof(IGrainA.MethodB1),
+            Constants.AnyMethod));
+
+        graph.IsLatestTransitionAllowed(callHistory).ShouldBeTrue();
+    }
+
+    [Test]
+    public void IsLatestTransitionAllowed_GrainOutgoing_EnforcesLatestTransition()
+    {
+        var graph = GrainCallsBuilder.Create()
+            .From<IGrainA>()
+            .To<IGrainB>()
+            .MethodByName(nameof(IGrainA.MethodB1), nameof(IGrainB.MethodB1))
+            .And()
+            .Build();
+
+        var callHistory = new CallHistory();
+        callHistory.Push(new InCall(
+            null,
+            GrainId.Create("graina", "latest-valid"),
+            typeof(IGrainA).FullName!,
+            nameof(IGrainA.MethodB1)));
+        callHistory.Push(new OutCall(
+            GrainId.Create("graina", "latest-valid"),
+            GrainId.Create("grainb", "latest-valid"),
+            typeof(IGrainA).FullName!,
+            typeof(IGrainB).FullName!,
+            nameof(IGrainB.MethodB1),
+            nameof(IGrainA.MethodB1)));
+
+        graph.IsLatestTransitionAllowed(callHistory).ShouldBeTrue();
+    }
+
+    [Test]
+    public void IsLatestTransitionAllowed_GrainOutgoing_RejectsMissingLatestTransition()
+    {
+        var graph = GrainCallsBuilder.Create()
+            .From<IGrainA>()
+            .To<IGrainB>()
+            .MethodByName(nameof(IGrainA.MethodB1), nameof(IGrainB.MethodB1))
+            .And()
+            .Build();
+
+        var callHistory = new CallHistory();
+        callHistory.Push(new InCall(
+            null,
+            GrainId.Create("graina", "latest-invalid"),
+            typeof(IGrainA).FullName!,
+            nameof(IGrainA.MethodB2)));
+        callHistory.Push(new OutCall(
+            GrainId.Create("graina", "latest-invalid"),
+            GrainId.Create("grainb", "latest-invalid"),
+            typeof(IGrainA).FullName!,
+            typeof(IGrainB).FullName!,
+            nameof(IGrainB.MethodC2),
+            nameof(IGrainA.MethodB2)));
+
+        graph.IsLatestTransitionAllowed(callHistory).ShouldBeFalse();
     }
 
     [Test]
@@ -150,7 +221,7 @@ public class GrainTransitionManagerTests
         var grainBId = GrainId.Create("grainb", "observed");
 
         var callHistory = new CallHistory();
-        callHistory.Push(new OutCall(null, grainAId, Constants.ClientCallerId, typeof(IGrainA).FullName!, nameof(IGrainA.MethodB1)));
+        callHistory.Push(new OutCall(null, grainAId, Constants.ClientCallerId, typeof(IGrainA).FullName!, nameof(IGrainA.MethodB1), Constants.AnyMethod));
         callHistory.Push(new InCall(null, grainAId, typeof(IGrainA).FullName!, nameof(IGrainA.MethodB1)));
         callHistory.Push(new OutCall(grainAId, grainBId, typeof(IGrainA).FullName!, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1), nameof(IGrainA.MethodB1)));
         callHistory.Push(new InCall(grainAId, grainBId, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1)));
@@ -184,7 +255,7 @@ public class GrainTransitionManagerTests
         var grainBId = GrainId.Create("grainb", "latest");
 
         var callHistory = new CallHistory();
-        callHistory.Push(new OutCall(null, grainAId, Constants.ClientCallerId, typeof(IGrainA).FullName!, nameof(IGrainA.MethodB1)));
+        callHistory.Push(new OutCall(null, grainAId, Constants.ClientCallerId, typeof(IGrainA).FullName!, nameof(IGrainA.MethodB1), Constants.AnyMethod));
         callHistory.Push(new InCall(null, grainAId, typeof(IGrainA).FullName!, nameof(IGrainA.MethodB1)));
         callHistory.Push(new OutCall(grainAId, grainBId, typeof(IGrainA).FullName!, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1), nameof(IGrainA.MethodB1)));
         callHistory.Push(new InCall(grainAId, grainBId, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1)));
@@ -199,6 +270,28 @@ public class GrainTransitionManagerTests
     }
 
     [Test]
+    public void GetObservedGraph_UsesExplicitCallerMethodForNonClientCallWithoutSourceId()
+    {
+        var callHistory = new CallHistory();
+        callHistory.Push(new OutCall(
+            null,
+            null,
+            typeof(IGrainA).FullName!,
+            typeof(IGrainB).FullName!,
+            nameof(IGrainB.MethodC2),
+            nameof(IGrainA.MethodB2)));
+        callHistory.Push(new InCall(null, null, typeof(IGrainB).FullName!, nameof(IGrainB.MethodC2)));
+
+        var graph = GrainTransitionManager.GetObservedGraph(callHistory);
+
+        graph.Edges.ShouldContain(edge =>
+            edge.Source == typeof(IGrainA).FullName &&
+            edge.Target == typeof(IGrainB).FullName &&
+            edge.SourceMethod == nameof(IGrainA.MethodB2) &&
+            edge.TargetMethod == nameof(IGrainB.MethodC2));
+    }
+
+    [Test]
     public void GetObservedGraph_RejectsBaseGrainIdentity()
     {
         var grainAId = GrainId.Create("graina", "concrete-implementation");
@@ -209,7 +302,8 @@ public class GrainTransitionManagerTests
             grainAId,
             Constants.ClientCallerId,
             typeof(Grain).FullName!,
-            nameof(IGrainA.MethodB1)));
+            nameof(IGrainA.MethodB1),
+            Constants.AnyMethod));
         callHistory.Push(new InCall(
             null,
             grainAId,
@@ -431,10 +525,83 @@ public class GrainTransitionManagerTests
         var grainId = GrainId.Create("test", nameof(IGrainA));
 
         var callHistory = new CallHistory();
-        callHistory.Push(new OutCall(grainId, grainId, typeof(IGrainA).FullName!, typeof(IGrainA).FullName!, nameof(IGrainA.MethodA1)));
+        callHistory.Push(new OutCall(
+            grainId,
+            grainId,
+            typeof(IGrainA).FullName!,
+            typeof(IGrainA).FullName!,
+            nameof(IGrainA.MethodA1),
+            nameof(IGrainA.MethodA1)));
         callHistory.Push(new InCall(grainId, grainId, typeof(IGrainA).FullName!, nameof(IGrainA.MethodA1)));
 
         graph.DetectDeadlocks(callHistory).ShouldBeFalse();
+    }
+
+    [Test]
+    public void DetectLatestDeadlock_DetectsCycleClosedByLatestOutgoingCall()
+    {
+        var graph = GrainCallsBuilder.Create()
+            .AllowAll()
+            .Build();
+
+        var grainAId = GrainId.Create("graina", "latest-deadlock");
+        var grainBId = GrainId.Create("grainb", "latest-deadlock");
+        var grainCId = GrainId.Create("grainc", "latest-deadlock");
+
+        var callHistory = new CallHistory();
+        callHistory.Push(new OutCall(
+            grainAId,
+            grainBId,
+            typeof(IGrainA).FullName!,
+            typeof(IGrainB).FullName!,
+            nameof(IGrainB.MethodB1),
+            nameof(IGrainA.MethodB1)));
+        callHistory.Push(new OutCall(
+            grainBId,
+            grainCId,
+            typeof(IGrainB).FullName!,
+            typeof(IGrainC).FullName!,
+            nameof(IGrainC.MethodC1),
+            nameof(IGrainB.MethodB1)));
+        callHistory.Push(new OutCall(
+            grainCId,
+            grainAId,
+            typeof(IGrainC).FullName!,
+            typeof(IGrainA).FullName!,
+            nameof(IGrainA.MethodA1),
+            nameof(IGrainC.MethodC1)));
+
+        graph.DetectLatestDeadlock(callHistory).ShouldBeTrue();
+    }
+
+    [Test]
+    public void DetectLatestDeadlock_ReturnsFalseWhenLatestOutgoingDoesNotCloseCycle()
+    {
+        var graph = GrainCallsBuilder.Create()
+            .AllowAll()
+            .Build();
+
+        var grainAId = GrainId.Create("graina", "latest-no-deadlock");
+        var grainBId = GrainId.Create("grainb", "latest-no-deadlock");
+        var grainCId = GrainId.Create("grainc", "latest-no-deadlock");
+
+        var callHistory = new CallHistory();
+        callHistory.Push(new OutCall(
+            grainAId,
+            grainBId,
+            typeof(IGrainA).FullName!,
+            typeof(IGrainB).FullName!,
+            nameof(IGrainB.MethodB1),
+            nameof(IGrainA.MethodB1)));
+        callHistory.Push(new OutCall(
+            grainBId,
+            grainCId,
+            typeof(IGrainB).FullName!,
+            typeof(IGrainC).FullName!,
+            nameof(IGrainC.MethodC1),
+            nameof(IGrainB.MethodB1)));
+
+        graph.DetectLatestDeadlock(callHistory).ShouldBeFalse();
     }
 
     [Test]
@@ -494,9 +661,15 @@ public class GrainTransitionManagerTests
         var grainBId = GrainId.Create("grainb", "live-policy");
 
         var callHistory = new CallHistory();
-        callHistory.Push(new OutCall(null, grainAId, Constants.ClientCallerId, typeof(IGrainA).FullName!, nameof(IGrainA.MethodB1)));
+        callHistory.Push(new OutCall(null, grainAId, Constants.ClientCallerId, typeof(IGrainA).FullName!, nameof(IGrainA.MethodB1), Constants.AnyMethod));
         callHistory.Push(new InCall(null, grainAId, typeof(IGrainA).FullName!, nameof(IGrainA.MethodB1)));
-        callHistory.Push(new OutCall(grainAId, grainBId, typeof(IGrainA).FullName!, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1)));
+        callHistory.Push(new OutCall(
+            grainAId,
+            grainBId,
+            typeof(IGrainA).FullName!,
+            typeof(IGrainB).FullName!,
+            nameof(IGrainB.MethodB1),
+            nameof(IGrainA.MethodB1)));
         callHistory.Push(new InCall(grainAId, grainBId, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1)));
 
         var diagram = graph.GenerateLiveMermaidDiagram(callHistory);
@@ -514,7 +687,7 @@ public class GrainTransitionManagerTests
             .Build();
 
         var callHistory = new CallHistory();
-        callHistory.Push(new OutCall(null, null, Constants.ClientCallerId, typeof(IGrainA).FullName!, nameof(IGrainA.MethodB1)));
+        callHistory.Push(new OutCall(null, null, Constants.ClientCallerId, typeof(IGrainA).FullName!, nameof(IGrainA.MethodB1), Constants.AnyMethod));
         callHistory.Push(new InCall(null, null, typeof(IGrainA).FullName!, nameof(IGrainA.MethodB1)));
 
         var diagram = graph.GenerateLiveMermaidDiagram(callHistory);
@@ -595,9 +768,9 @@ public class GrainTransitionManagerTests
             .Build();
 
         var callHistory = new CallHistory();
-        callHistory.Push(new OutCall(null, null, typeof(IGrainA).FullName!, typeof(IGrainB).FullName!, nameof(IGrainA.MethodB1)));
+        callHistory.Push(new OutCall(null, null, typeof(IGrainA).FullName!, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1), nameof(IGrainA.MethodB1)));
         callHistory.Push(new InCall(null, null, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1)));
-        callHistory.Push(new OutCall(null, null, typeof(IGrainA).FullName!, typeof(IGrainB).FullName!, nameof(IGrainA.MethodB1)));
+        callHistory.Push(new OutCall(null, null, typeof(IGrainA).FullName!, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1), nameof(IGrainA.MethodB1)));
         callHistory.Push(new InCall(null, null, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1)));
 
         var diagram = graph.GenerateLiveMermaidDiagram(callHistory);

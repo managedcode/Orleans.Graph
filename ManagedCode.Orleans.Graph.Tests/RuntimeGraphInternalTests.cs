@@ -1,6 +1,5 @@
 using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
-using ManagedCode.Orleans.Graph.Telemetry;
 using ManagedCode.Orleans.Graph.Tests.Cluster.Grains.Interfaces;
 using ManagedCode.Orleans.Graph.Tests.RuntimeGraphCluster;
 
@@ -28,7 +27,7 @@ public class RuntimeGraphInternalTests(TestRuntimeGraphInternalClusterApplicatio
         {
             var graph = await telemetry.GetObservedGraphAsync();
             edges = graph.Edges;
-            if (edges.Any(edge => edge.Target == typeof(OrleansGraphTelemetryWorker).FullName))
+            if (edges.Any(edge => edge.Target == typeof(IOrleansGraphTelemetryWorker).FullName))
             {
                 break;
             }
@@ -36,6 +35,11 @@ public class RuntimeGraphInternalTests(TestRuntimeGraphInternalClusterApplicatio
             await Task.Delay(100);
         }
 
-        edges.ShouldContain(edge => edge.Target == typeof(OrleansGraphTelemetryWorker).FullName);
+        edges.ShouldContain(edge => edge.Target == typeof(IOrleansGraphTelemetryWorker).FullName);
+        edges.ShouldContain(edge =>
+            edge.Source == typeof(IOrleansGraphTelemetryWorker).FullName &&
+            edge.Target == typeof(IOrleansGraphTelemetryGrain).FullName &&
+            edge.SourceMethod == nameof(IOrleansGraphTelemetryWorker.FlushAsync) &&
+            edge.TargetMethod == nameof(IOrleansGraphTelemetryGrain.MergeObservedCallsAsync));
     }
 }

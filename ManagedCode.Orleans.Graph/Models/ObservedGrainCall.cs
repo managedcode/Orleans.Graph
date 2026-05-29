@@ -18,21 +18,21 @@ public sealed record ObservedGrainCall(
         return new ObservedGrainCall(source, target, sourceMethod, targetMethod, 1, now, now);
     }
 
-    public ObservedGrainCall Merge(ObservedGrainCall edge)
+    public ObservedGrainCall Merge(ObservedGrainCall call)
     {
-        if (!string.Equals(Source, edge.Source, StringComparison.Ordinal) ||
-            !string.Equals(Target, edge.Target, StringComparison.Ordinal) ||
-            !string.Equals(SourceMethod, edge.SourceMethod, StringComparison.Ordinal) ||
-            !string.Equals(TargetMethod, edge.TargetMethod, StringComparison.Ordinal))
+        if (!string.Equals(Source, call.Source, StringComparison.Ordinal) ||
+            !string.Equals(Target, call.Target, StringComparison.Ordinal) ||
+            !string.Equals(SourceMethod, call.SourceMethod, StringComparison.Ordinal) ||
+            !string.Equals(TargetMethod, call.TargetMethod, StringComparison.Ordinal))
         {
-            throw new InvalidOperationException("Observed grain call edges must share the same identity to be merged.");
+            throw new InvalidOperationException("Observed grain calls must share the same identity to be merged.");
         }
 
         return this with
         {
-            Count = Count + edge.Count,
-            FirstSeenUtc = FirstSeenUtc <= edge.FirstSeenUtc ? FirstSeenUtc : edge.FirstSeenUtc,
-            LastSeenUtc = LastSeenUtc >= edge.LastSeenUtc ? LastSeenUtc : edge.LastSeenUtc
+            Count = Count + call.Count,
+            FirstSeenUtc = FirstSeenUtc <= call.FirstSeenUtc ? FirstSeenUtc : call.FirstSeenUtc,
+            LastSeenUtc = LastSeenUtc >= call.LastSeenUtc ? LastSeenUtc : call.LastSeenUtc
         };
     }
 }

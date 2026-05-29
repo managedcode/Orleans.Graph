@@ -9,9 +9,13 @@ public static class RequestContextHelper
     {
         EnsureValidGrainIdentity(context.InterfaceName, context.MethodName);
 
-        var call = context.GetCallHistory();
+        var call = GetOrCreateCallHistory(out var created);
         call.Push(new InCall(context.SourceId, context.TargetId, context.InterfaceName, context.MethodName));
-        context.SetCallHistory(call);
+        if (created)
+        {
+            context.SetCallHistory(call);
+        }
+
         SetCurrentCaller(context.InterfaceName, context.MethodName);
         return true;
     }
@@ -20,18 +24,21 @@ public static class RequestContextHelper
     {
         EnsureValidGrainIdentity(context.InterfaceName, context.MethodName);
 
-        var caller = ResolveCallerInterface(context);
-        var callerMethod = ResolveCallerMethod(context);
+        var callerContext = ResolveCaller(context);
 
-        var call = context.GetCallHistory();
+        var call = GetOrCreateCallHistory(out var created);
         call.Push(new OutCall(
             context.SourceId,
             context.TargetId,
-            caller,
+            callerContext.Caller,
             context.InterfaceName,
             context.MethodName,
-            callerMethod));
-        context.SetCallHistory(call);
+            callerContext.Method));
+        if (created)
+        {
+            context.SetCallHistory(call);
+        }
+
         return true;
     }
 
@@ -57,7 +64,12 @@ public static class RequestContextHelper
 
     public static CallHistory GetCallHistory(this IGrainCallContext context)
     {
-        return RequestContext.Get(Constants.RequestContextKey) as CallHistory ?? new CallHistory();
+        if (RequestContext.Get(Constants.RequestContextKey) is CallHistory callHistory)
+        {
+            return callHistory;
+        }
+
+        throw new InvalidOperationException("Unable to resolve Orleans graph call history from request context.");
     }
 
     public static bool IsCallHistoryExist(this IGrainCallContext context)
@@ -68,6 +80,19 @@ public static class RequestContextHelper
     public static void SetCallHistory(this IGrainCallContext context, CallHistory callHistory)
     {
         RequestContext.Set(Constants.RequestContextKey, callHistory);
+    }
+
+    private static CallHistory GetOrCreateCallHistory(out bool created)
+    {
+        var callHistory = RequestContext.Get(Constants.RequestContextKey) as CallHistory;
+        if (callHistory is not null)
+        {
+            created = false;
+            return callHistory;
+        }
+
+        created = true;
+        return new CallHistory();
     }
 
     public static bool IsOrleansGraphTelemetryCall(this IGrainCallContext context)
@@ -81,17 +106,14 @@ public static class RequestContextHelper
         return RequestContext.Get(Constants.TelemetrySuppressionContextKey) is true;
     }
 
-    public static (object? Caller, object? Method) CaptureCurrentCaller()
+    public static object? CaptureCurrentCaller()
     {
-        return (
-            RequestContext.Get(Constants.CurrentCallerInterfaceContextKey),
-            RequestContext.Get(Constants.CurrentCallerMethodContextKey));
+        return RequestContext.Get(Constants.CurrentCallerContextKey);
     }
 
-    public static void RestoreCurrentCaller((object? Caller, object? Method) currentCaller)
+    public static void RestoreCurrentCaller(object? currentCaller)
     {
-        RestoreRequestContextValue(Constants.CurrentCallerInterfaceContextKey, currentCaller.Caller);
-        RestoreRequestContextValue(Constants.CurrentCallerMethodContextKey, currentCaller.Method);
+        RestoreRequestContextValue(Constants.CurrentCallerContextKey, currentCaller);
     }
 
     public static async Task RunWithTelemetrySuppressedAsync(Func<Task> action)
@@ -118,6 +140,28 @@ public static class RequestContextHelper
         }
     }
 
+    public static async Task RunWithCurrentCallerAsync(string caller, string method, Func<Task> action)
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        EnsureValidGrainIdentity(caller, method);
+        if (string.IsNullOrWhiteSpace(method))
+        {
+            throw new InvalidOperationException($"Unable to set current caller {caller} without a method.");
+        }
+
+        var currentCaller = CaptureCurrentCaller();
+        SetCurrentCaller(caller, method);
+
+        try
+        {
+            await action();
+        }
+        finally
+        {
+            RestoreCurrentCaller(currentCaller);
+        }
+    }
+
     private static bool ShouldSkipTracking(this IGrainCallContext context, GraphCallFilterConfig graphCallFilterConfig, string moduleName)
     {
         if (!graphCallFilterConfig.TrackOrleansCalls && moduleName.StartsWith("Orleans.", StringComparison.Ordinal))
@@ -138,44 +182,27 @@ public static class RequestContextHelper
         return false;
     }
 
-    private static string ResolveCallerInterface(IOutgoingGrainCallContext context)
+    private static CurrentCallerContext ResolveCaller(IOutgoingGrainCallContext context)
     {
         if (!context.SourceId.HasValue)
         {
-            return Constants.ClientCallerId;
+            return new CurrentCallerContext(Constants.ClientCallerId, Constants.AnyMethod);
         }
 
-        if (RequestContext.Get(Constants.CurrentCallerInterfaceContextKey) is string caller &&
-            IsValidGrainIdentity(caller))
+        if (RequestContext.Get(Constants.CurrentCallerContextKey) is CurrentCallerContext callerContext &&
+            IsValidGrainIdentity(callerContext.Caller) &&
+            !string.IsNullOrWhiteSpace(callerContext.Method))
         {
-            return caller;
+            return callerContext;
         }
 
         throw new InvalidOperationException(
             $"Unable to resolve caller grain interface for outgoing call to {context.InterfaceName}.{context.MethodName}.");
     }
 
-    private static string ResolveCallerMethod(IOutgoingGrainCallContext context)
-    {
-        if (!context.SourceId.HasValue)
-        {
-            return Constants.AnyMethod;
-        }
-
-        if (RequestContext.Get(Constants.CurrentCallerMethodContextKey) is string method &&
-            !string.IsNullOrWhiteSpace(method))
-        {
-            return method;
-        }
-
-        throw new InvalidOperationException(
-            $"Unable to resolve caller grain method for outgoing call to {context.InterfaceName}.{context.MethodName}.");
-    }
-
     private static void SetCurrentCaller(string caller, string method)
     {
-        RequestContext.Set(Constants.CurrentCallerInterfaceContextKey, caller);
-        RequestContext.Set(Constants.CurrentCallerMethodContextKey, method);
+        RequestContext.Set(Constants.CurrentCallerContextKey, new CurrentCallerContext(caller, method));
     }
 
     private static void RestoreRequestContextValue(string key, object? value)
@@ -197,7 +224,7 @@ public static class RequestContextHelper
         }
 
         throw new InvalidOperationException(
-            $"Resolved Orleans graph identity for {grainType}.{method} is not a concrete grain interface.");
+            $"Resolved Orleans graph identity for {grainType}.{method} is not a concrete grain interface or implementation type.");
     }
 
     private static bool IsBaseGrainType(string grainType)
@@ -210,4 +237,5 @@ public static class RequestContextHelper
     {
         return !string.IsNullOrWhiteSpace(grainType) && !IsBaseGrainType(grainType);
     }
+
 }

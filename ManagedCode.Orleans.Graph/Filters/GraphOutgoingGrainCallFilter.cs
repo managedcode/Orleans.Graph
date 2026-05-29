@@ -6,7 +6,7 @@ namespace ManagedCode.Orleans.Graph.Filters;
 
 public class GraphOutgoingGrainCallFilter(IServiceProvider serviceProvider, GraphCallFilterConfig graphCallFilterConfig) : IOutgoingGrainCallFilter
 {
-    private GrainTransitionManager? GraphManager => serviceProvider.GetService<GrainTransitionManager>();
+    private readonly GrainTransitionManager? _graphManager = serviceProvider.GetService<GrainTransitionManager>();
 
     public Task Invoke(IOutgoingGrainCallContext context)
     {
@@ -14,8 +14,9 @@ public class GraphOutgoingGrainCallFilter(IServiceProvider serviceProvider, Grap
         {
             if (!context.IsOrleansGraphTelemetryCall())
             {
-                GraphManager?.IsTransitionAllowed(context.GetCallHistory(), true);
-                GraphManager?.DetectDeadlocks(context.GetCallHistory(), true);
+                var callHistory = context.GetCallHistory();
+                _graphManager?.DetectLatestDeadlock(callHistory, true);
+                _graphManager?.IsLatestTransitionAllowed(callHistory, true);
             }
         }
 

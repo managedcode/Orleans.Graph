@@ -7,7 +7,7 @@ public class TransitionBuilder<TFrom>(GrainCallsBuilder parent, string sourceTyp
 
     public IMethodBuilder<TFrom, TGrain> To<TGrain>() where TGrain : IGrain
     {
-        return new MethodBuilder<TFrom, TGrain>(_parent, _sourceType, typeof(TGrain).FullName ?? typeof(TGrain).Name);
+        return new MethodBuilder<TFrom, TGrain>(_parent, _sourceType, typeof(TGrain).GetTypeName());
     }
 
     public IGrainCallsBuilder And() => _parent;

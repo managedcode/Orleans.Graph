@@ -55,7 +55,7 @@ siloBuilder.AddOrleansGraph(graph =>
 });
 ```
 
-Register the client-side outgoing filter when Orleans clients should participate in the same call-history tracking.
+Register the client-side outgoing filter when Orleans clients should participate in the same call-history tracking. This is only required for client-originated edges such as `ORLEANS_GRAIN_CLIENT -> IOrderGrain`. Grain-to-grain calls that start inside a silo, for example from another grain, timer, reminder, hosted service, or injected `IGrainFactory`, are tracked by the silo filters.
 
 ```csharp
 clientBuilder.AddOrleansGraph();
@@ -64,6 +64,8 @@ clientBuilder.AddOrleansGraph();
 ## Observe Mode
 
 Use `AllowAll()` when you want to discover real traffic before enforcing a strict policy. In this mode, unconfigured transitions are allowed, but the filters still send observed calls to stateless telemetry workers. Those workers aggregate calls and periodically flush them into an in-memory telemetry grain used by the live graph.
+
+`AllowAll()` is useful for documenting expected traffic without blocking unconfigured transitions. It is not a requirement for live telemetry: the live graph is recorded in both enforcing and observe modes.
 
 ```csharp
 using ManagedCode.Orleans.Graph.Extensions;
@@ -91,7 +93,21 @@ var observedGraph = await telemetry.GetObservedGraphAsync();
 var liveMermaidDiagram = await telemetry.GenerateLiveMermaidDiagramAsync();
 ```
 
-`AllowAll()` is not required for live telemetry. It only changes enforcement behavior: missing transitions are allowed instead of blocked. Orleans.Graph internal telemetry calls are excluded by default so the graph shows application traffic. Set `TrackOrleansGraphInternalCalls = true` only when debugging the telemetry pipeline itself.
+The live telemetry pipeline records one observed edge from the incoming side, after Orleans has both sides of the call pair. The filters send the edge to stateless telemetry workers, workers aggregate repeated calls in memory, and a timer flushes the aggregated counts into the telemetry grain. The timer does not keep stateless workers alive.
+
+Orleans.Graph internal telemetry calls are excluded by default so the graph shows application traffic. Set `TrackOrleansGraphInternalCalls = true` only when debugging the telemetry pipeline itself.
+
+```csharp
+siloBuilder.AddOrleansGraph(
+    configureFilters: filters =>
+    {
+        filters.TrackOrleansGraphInternalCalls = true;
+    },
+    configureGraph: graph =>
+    {
+        graph.AllowAll();
+    });
+```
 
 ## Attribute Setup
 
@@ -120,7 +136,7 @@ public interface IPaymentGrain : IGrainWithStringKey
 
 ## Diagnostics
 
-Generate configured-policy and live-call Mermaid diagrams. The live graph is also available from the in-memory telemetry grain populated by the filters.
+Generate configured-policy and per-request Mermaid diagrams from the registered `GrainTransitionManager`. For the cluster-wide live graph, use the telemetry grain API because it reads the aggregated runtime graph from all filters and stateless workers.
 
 ```csharp
 var manager = serviceProvider.GetRequiredService<GrainTransitionManager>();
@@ -136,6 +152,8 @@ var liveMermaidGraph = await telemetry.GenerateLiveMermaidDiagramAsync();
 ```
 
 `liveGraph.Vertices` contains grain identities. `liveGraph.Edges` contains observed runtime transitions between those vertices, including `SourceMethod`, `TargetMethod`, hit count, and timestamps. The Mermaid API renders the same graph for visualization.
+
+Runtime vertices are exact graph identities. The client is represented as `ORLEANS_GRAIN_CLIENT`; grain vertices use the concrete Orleans grain interface or implementation identity resolved from Orleans call context. The runtime graph does not fall back to the base `Grain` class or wildcard methods when caller identity is required.
 
 Inspect the configured policy without parsing Mermaid.
 

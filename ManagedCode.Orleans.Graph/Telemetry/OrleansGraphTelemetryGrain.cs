@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
 
@@ -5,7 +6,7 @@ namespace ManagedCode.Orleans.Graph.Telemetry;
 
 public sealed class OrleansGraphTelemetryGrain : Grain, IOrleansGraphTelemetryGrain, IObservedGrainCallSink
 {
-    private readonly Dictionary<ObservedGrainCallKey, ObservedGrainCall> _edges = new();
+    private readonly Dictionary<ObservedGrainCallKey, ObservedGrainCallAccumulator> _observedCalls = new();
 
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
@@ -13,39 +14,61 @@ public sealed class OrleansGraphTelemetryGrain : Grain, IOrleansGraphTelemetryGr
         return Task.CompletedTask;
     }
 
-    public Task MergeAsync(IReadOnlyCollection<ObservedGrainCall> edges)
+    public Task MergeObservedCallsAsync(IReadOnlyCollection<ObservedGrainCall> observedCalls)
     {
-        ArgumentNullException.ThrowIfNull(edges);
+        ArgumentNullException.ThrowIfNull(observedCalls);
 
-        RecordObservedCalls(edges);
+        RecordObservedCalls(observedCalls);
         return Task.CompletedTask;
     }
 
     public Task<ObservedGrainCallGraph> GetObservedGraphAsync()
     {
-        return Task.FromResult(GrainTransitionManager.BuildObservedGraph(_edges.Values));
+        return Task.FromResult(GrainTransitionManager.BuildObservedGraphFromSnapshot(CreateSnapshot()));
     }
 
     public Task<string> GenerateLiveMermaidDiagramAsync()
     {
-        var observedGraph = GrainTransitionManager.BuildObservedGraph(_edges.Values);
+        var observedGraph = GrainTransitionManager.BuildObservedGraphFromSnapshot(CreateSnapshot());
         return Task.FromResult(GrainTransitionManager.GenerateObservedGraphMermaidDiagram(observedGraph));
     }
 
     public Task ClearAsync()
     {
-        _edges.Clear();
+        _observedCalls.Clear();
         return Task.CompletedTask;
     }
 
-    public void RecordObservedCalls(IReadOnlyCollection<ObservedGrainCall> edges)
+    public void RecordObservedCalls(IReadOnlyCollection<ObservedGrainCall> observedCalls)
     {
-        foreach (var edge in edges)
+        foreach (var observedCall in observedCalls)
         {
-            var key = ObservedGrainCallKey.From(edge);
-            _edges[key] = _edges.TryGetValue(key, out var existing)
-                ? existing.Merge(edge)
-                : edge;
+            RecordObservedCall(observedCall);
         }
+    }
+
+    public void RecordObservedCall(ObservedGrainCall observedCall)
+    {
+        var key = ObservedGrainCallKey.From(observedCall);
+        ref var accumulator = ref CollectionsMarshal.GetValueRefOrAddDefault(_observedCalls, key, out var exists);
+        if (exists)
+        {
+            accumulator.Merge(observedCall);
+            return;
+        }
+
+        accumulator = new ObservedGrainCallAccumulator(observedCall);
+    }
+
+    private ObservedGrainCall[] CreateSnapshot()
+    {
+        var snapshot = new ObservedGrainCall[_observedCalls.Count];
+        var index = 0;
+        foreach (var accumulator in _observedCalls.Values)
+        {
+            snapshot[index++] = accumulator.ToObservedGrainCall();
+        }
+
+        return snapshot;
     }
 }

@@ -58,7 +58,13 @@ public class AttributeClusterTests(TestAttributeClusterApplication fixture)
         var manager = _fixture.Cluster.Client.ServiceProvider.GetRequiredService<GrainTransitionManager>();
 
         var history = new CallHistory();
-        history.Push(new OutCall(null, null, typeof(IAttributeClusterGrainA).FullName!, typeof(IAttributeClusterGrainB).FullName!, nameof(IAttributeClusterGrainA.CallB)));
+        history.Push(new OutCall(
+            null,
+            null,
+            typeof(IAttributeClusterGrainA).FullName!,
+            typeof(IAttributeClusterGrainB).FullName!,
+            nameof(IAttributeClusterGrainA.CallB),
+            nameof(IAttributeClusterGrainA.CallB)));
         history.Push(new InCall(null, null, typeof(IAttributeClusterGrainB).FullName!, nameof(IAttributeClusterGrainB.MethodB)));
 
         var diagram = manager.GenerateLiveMermaidDiagram(history);

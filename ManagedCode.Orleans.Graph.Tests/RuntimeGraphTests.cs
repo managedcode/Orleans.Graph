@@ -206,11 +206,11 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
 
         var expectedEdges = BuildExpectedComplexFlowEdges(nameof(IGrainA.MethodComplexFlow), includeClient: true);
 
-        var edges = await WaitForObservedCallsAsync(_fixture.Cluster.Client, edges =>
-            edges.Count == expectedEdges.Length && ContainsExpectedCalls(edges, expectedEdges));
+        var observedGraph = await WaitForObservedGraphAsync(_fixture.Cluster.Client, graph =>
+            graph.Edges.Count == expectedEdges.Length && ContainsExpectedCalls(graph.Edges, expectedEdges));
 
-        AssertExpectedCalls(edges, expectedEdges);
-        edges.Any(IsTelemetryEdge).ShouldBeFalse();
+        AssertExpectedGraph(observedGraph, expectedEdges);
+        observedGraph.Edges.Any(IsTelemetryEdge).ShouldBeFalse();
 
         var telemetry = _fixture.Cluster.Client.GetGrain<IOrleansGraphTelemetryGrain>(Constants.LiveGraphTelemetryGrainKey);
         var diagram = await telemetry.GenerateLiveMermaidDiagramAsync();
@@ -231,12 +231,12 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
 
         var expectedEdges = BuildExpectedComplexFlowEdges(nameof(IGrainA.MethodGrainOnlyComplexFlow), includeClient: false);
 
-        var edges = await WaitForObservedCallsAsync(_fixture.Cluster.Client, edges =>
-            edges.Count == expectedEdges.Length && ContainsExpectedCalls(edges, expectedEdges));
+        var observedGraph = await WaitForObservedGraphAsync(_fixture.Cluster.Client, graph =>
+            graph.Edges.Count == expectedEdges.Length && ContainsExpectedCalls(graph.Edges, expectedEdges));
 
-        AssertExpectedCalls(edges, expectedEdges);
-        edges.Any(edge => edge.Source == Constants.ClientCallerId || edge.Target == Constants.ClientCallerId).ShouldBeFalse();
-        edges.Any(IsTelemetryEdge).ShouldBeFalse();
+        AssertExpectedGraph(observedGraph, expectedEdges);
+        observedGraph.Edges.Any(edge => edge.Source == Constants.ClientCallerId || edge.Target == Constants.ClientCallerId).ShouldBeFalse();
+        observedGraph.Edges.Any(IsTelemetryEdge).ShouldBeFalse();
 
         var telemetry = _fixture.Cluster.Client.GetGrain<IOrleansGraphTelemetryGrain>(Constants.LiveGraphTelemetryGrainKey);
         var diagram = await telemetry.GenerateLiveMermaidDiagramAsync();
@@ -257,12 +257,12 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
         result.ShouldBe(5);
 
         var expectedEdges = BuildExpectedComplexFlowEdges(nameof(IGrainA.MethodGrainOnlyComplexFlow), includeClient: false);
-        var edges = await WaitForObservedCallsAsync(grainFactory, edges =>
-            edges.Count == expectedEdges.Length && ContainsExpectedCalls(edges, expectedEdges));
+        var observedGraph = await WaitForObservedGraphAsync(grainFactory, graph =>
+            graph.Edges.Count == expectedEdges.Length && ContainsExpectedCalls(graph.Edges, expectedEdges));
 
-        AssertExpectedCalls(edges, expectedEdges);
-        edges.Any(edge => edge.Source == Constants.ClientCallerId || edge.Target == Constants.ClientCallerId).ShouldBeFalse();
-        edges.Any(IsTelemetryEdge).ShouldBeFalse();
+        AssertExpectedGraph(observedGraph, expectedEdges);
+        observedGraph.Edges.Any(edge => edge.Source == Constants.ClientCallerId || edge.Target == Constants.ClientCallerId).ShouldBeFalse();
+        observedGraph.Edges.Any(IsTelemetryEdge).ShouldBeFalse();
 
         var telemetry = grainFactory.GetGrain<IOrleansGraphTelemetryGrain>(Constants.LiveGraphTelemetryGrainKey);
         var diagram = await telemetry.GenerateLiveMermaidDiagramAsync();
@@ -343,6 +343,26 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
                 edge.TargetMethod == expected.TargetMethod &&
                 edge.Count == expected.Count);
         }
+    }
+
+    private static void AssertExpectedGraph(
+        ObservedGrainCallGraph observedGraph,
+        IReadOnlyCollection<ExpectedObservedCall> expectedEdges)
+    {
+        AssertExpectedCalls(observedGraph.Edges, expectedEdges);
+
+        var expectedVertices = expectedEdges
+            .SelectMany(static edge => new[] { edge.Source, edge.Target })
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static vertex => vertex, StringComparer.Ordinal)
+            .ToArray();
+
+        observedGraph.Vertices
+            .Select(static vertex => vertex.Id)
+            .OrderBy(static vertex => vertex, StringComparer.Ordinal)
+            .ShouldBe(expectedVertices);
+
+        observedGraph.Vertices.Any(vertex => IsBaseGrainEndpoint(vertex.Id)).ShouldBeFalse();
     }
 
     private static bool ContainsExpectedCalls(

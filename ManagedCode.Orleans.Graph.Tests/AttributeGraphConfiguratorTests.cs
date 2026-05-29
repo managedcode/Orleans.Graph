@@ -16,12 +16,18 @@ public class AttributeGraphConfiguratorTests
 
         var clientHistory = new CallHistory();
         clientHistory.Push(new InCall(null, null, typeof(IAttributeGrainA).FullName!, nameof(IAttributeGrainA.MethodA1)));
-        clientHistory.Push(new OutCall(null, null, Constants.ClientCallerId, typeof(IAttributeGrainA).FullName!, nameof(IAttributeGrainA.MethodA1)));
+        clientHistory.Push(new OutCall(null, null, Constants.ClientCallerId, typeof(IAttributeGrainA).FullName!, nameof(IAttributeGrainA.MethodA1), Constants.AnyMethod));
 
         manager.IsTransitionAllowed(clientHistory).ShouldBeTrue();
 
         var reentrantHistory = new CallHistory();
-        reentrantHistory.Push(new OutCall(null, null, typeof(IAttributeGrainB).FullName!, typeof(IAttributeGrainB).FullName!, nameof(IAttributeGrainB.MethodB1)));
+        reentrantHistory.Push(new OutCall(
+            null,
+            null,
+            typeof(IAttributeGrainB).FullName!,
+            typeof(IAttributeGrainB).FullName!,
+            nameof(IAttributeGrainB.MethodB1),
+            nameof(IAttributeGrainB.MethodB1)));
         reentrantHistory.Push(new InCall(null, null, typeof(IAttributeGrainB).FullName!, nameof(IAttributeGrainB.MethodB1)));
 
         manager.IsTransitionAllowed(reentrantHistory).ShouldBeTrue();
@@ -73,7 +79,7 @@ public class AttributeGraphConfiguratorTests
 
         var history = new CallHistory();
         history.Push(new InCall(null, null, typeof(IAttributeGrainB).FullName!, nameof(IAttributeGrainB.MethodB1)));
-        history.Push(new OutCall(null, null, Constants.ClientCallerId, typeof(IAttributeGrainB).FullName!, nameof(IAttributeGrainB.MethodB1)));
+        history.Push(new OutCall(null, null, Constants.ClientCallerId, typeof(IAttributeGrainB).FullName!, nameof(IAttributeGrainB.MethodB1), Constants.AnyMethod));
 
         manager.IsTransitionAllowed(history).ShouldBeTrue();
     }

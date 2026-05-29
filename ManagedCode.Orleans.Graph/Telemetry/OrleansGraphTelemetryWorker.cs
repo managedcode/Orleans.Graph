@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using ManagedCode.Orleans.Graph.Extensions;
 using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
@@ -9,7 +10,7 @@ namespace ManagedCode.Orleans.Graph.Telemetry;
 public sealed class OrleansGraphTelemetryWorker(GraphCallFilterConfig graphCallFilterConfig) : Grain, IOrleansGraphTelemetryWorker, IObservedGrainCallSink
 {
     private static readonly TimeSpan _defaultFlushPeriod = TimeSpan.FromSeconds(1);
-    private readonly Dictionary<ObservedGrainCallKey, ObservedGrainCall> _edges = new();
+    private readonly Dictionary<ObservedGrainCallKey, ObservedGrainCallAccumulator> _observedCalls = new();
 
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
@@ -30,30 +31,39 @@ public sealed class OrleansGraphTelemetryWorker(GraphCallFilterConfig graphCallF
         return Task.CompletedTask;
     }
 
-    public Task RecordAsync(IReadOnlyCollection<ObservedGrainCall> edges)
+    public Task RecordObservedCallsAsync(IReadOnlyCollection<ObservedGrainCall> observedCalls)
     {
-        ArgumentNullException.ThrowIfNull(edges);
+        ArgumentNullException.ThrowIfNull(observedCalls);
 
-        RecordObservedCalls(edges);
+        RecordObservedCalls(observedCalls);
+        return Task.CompletedTask;
+    }
+
+    public Task RecordObservedCallAsync(ObservedGrainCall observedCall)
+    {
+        RecordObservedCall(observedCall);
         return Task.CompletedTask;
     }
 
     public async Task FlushAsync()
     {
-        if (_edges.Count == 0)
+        if (_observedCalls.Count == 0)
         {
             return;
         }
 
-        var snapshot = _edges.Values.ToArray();
-        _edges.Clear();
+        var snapshot = CreateSnapshot();
+        _observedCalls.Clear();
 
         try
         {
             await RequestContextHelper.RunWithTelemetrySuppressedAsync(() =>
-                GrainFactory
-                    .GetGrain<IOrleansGraphTelemetryGrain>(Constants.LiveGraphTelemetryGrainKey)
-                    .MergeAsync(snapshot));
+                RequestContextHelper.RunWithCurrentCallerAsync(
+                    typeof(IOrleansGraphTelemetryWorker).GetTypeName(),
+                    nameof(IOrleansGraphTelemetryWorker.FlushAsync),
+                    () => GrainFactory
+                        .GetGrain<IOrleansGraphTelemetryGrain>(Constants.LiveGraphTelemetryGrainKey)
+                        .MergeObservedCallsAsync(snapshot)));
         }
         catch
         {
@@ -62,16 +72,41 @@ public sealed class OrleansGraphTelemetryWorker(GraphCallFilterConfig graphCallF
         }
     }
 
-    public void RecordObservedCalls(IReadOnlyCollection<ObservedGrainCall> edges)
+    public void RecordObservedCalls(IReadOnlyCollection<ObservedGrainCall> observedCalls)
     {
-        foreach (var edge in edges)
+        foreach (var observedCall in observedCalls)
         {
-            var key = ObservedGrainCallKey.From(edge);
-            _edges[key] = _edges.TryGetValue(key, out var existing)
-                ? existing.Merge(edge)
-                : edge;
+            RecordObservedCall(observedCall);
         }
     }
 
-    private Task FlushTimerAsync(CancellationToken cancellationToken) => FlushAsync();
+    public void RecordObservedCall(ObservedGrainCall observedCall)
+    {
+        var key = ObservedGrainCallKey.From(observedCall);
+        ref var accumulator = ref CollectionsMarshal.GetValueRefOrAddDefault(_observedCalls, key, out var exists);
+        if (exists)
+        {
+            accumulator.Merge(observedCall);
+            return;
+        }
+
+        accumulator = new ObservedGrainCallAccumulator(observedCall);
+    }
+
+    private ObservedGrainCall[] CreateSnapshot()
+    {
+        var snapshot = new ObservedGrainCall[_observedCalls.Count];
+        var index = 0;
+        foreach (var accumulator in _observedCalls.Values)
+        {
+            snapshot[index++] = accumulator.ToObservedGrainCall();
+        }
+
+        return snapshot;
+    }
+
+    private Task FlushTimerAsync(CancellationToken cancellationToken)
+    {
+        return cancellationToken.IsCancellationRequested ? Task.CompletedTask : FlushAsync();
+    }
 }

@@ -7,6 +7,5 @@ public static class Constants
     public const string AnyMethod = "*";
     public const string LiveGraphTelemetryGrainKey = "mc.orleans.graph.live";
     public const string TelemetrySuppressionContextKey = "mc.orleans.graph.telemetry.suppressed";
-    public const string CurrentCallerInterfaceContextKey = "mc.orleans.graph.current.interface";
-    public const string CurrentCallerMethodContextKey = "mc.orleans.graph.current.method";
+    public const string CurrentCallerContextKey = "mc.orleans.graph.current.caller";
 }

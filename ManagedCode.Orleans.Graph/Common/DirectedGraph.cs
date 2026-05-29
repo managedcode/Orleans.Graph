@@ -1,18 +1,19 @@
+using System.Runtime.InteropServices;
 using ManagedCode.Orleans.Graph.Models;
 
 namespace ManagedCode.Orleans.Graph;
 
 public class DirectedGraph(bool allowSelfLoops = false)
 {
-    private readonly Dictionary<string, Dictionary<string, HashSet<GrainTransition>>> _adjacencyList = new();
-    private readonly HashSet<string> _vertices = new();
+    private readonly Dictionary<string, Dictionary<string, HashSet<GrainTransition>>> _adjacencyList = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _vertices = new(StringComparer.Ordinal);
     private readonly bool _allowSelfLoops = allowSelfLoops;
 
     public void AddVertex(string vertex)
     {
         if (_vertices.Add(vertex))
         {
-            _adjacencyList[vertex] = new Dictionary<string, HashSet<GrainTransition>>();
+            _adjacencyList[vertex] = new Dictionary<string, HashSet<GrainTransition>>(StringComparer.Ordinal);
         }
     }
 
@@ -26,10 +27,11 @@ public class DirectedGraph(bool allowSelfLoops = false)
         AddVertex(source);
         AddVertex(target);
 
-        if (!_adjacencyList[source].TryGetValue(target, out var transitions))
+        var sourceTargets = _adjacencyList[source];
+        ref var transitions = ref CollectionsMarshal.GetValueRefOrAddDefault(sourceTargets, target, out var exists);
+        if (!exists || transitions is null)
         {
             transitions = new HashSet<GrainTransition>();
-            _adjacencyList[source][target] = transitions;
         }
 
         transitions.Add(transition);
@@ -37,9 +39,9 @@ public class DirectedGraph(bool allowSelfLoops = false)
         if (!transition.IsReentrant && HasCycle())
         {
             transitions.Remove(transition);
-            if (_adjacencyList[source][target].Count == 0)
+            if (transitions.Count == 0)
             {
-                _adjacencyList[source].Remove(target);
+                sourceTargets.Remove(target);
             }
             throw new InvalidOperationException($"Adding transition from {source} to {target} creates a cycle.");
         }
@@ -52,13 +54,21 @@ public class DirectedGraph(bool allowSelfLoops = false)
             return false;
         }
 
-        return transitions.Any(t => t.MatchesMethods(sourceMethod, targetMethod));
+        foreach (var transition in transitions)
+        {
+            if (transition.MatchesMethods(sourceMethod, targetMethod))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public bool HasCycle()
     {
-        var visited = new HashSet<string>();
-        var recursionStack = new HashSet<string>();
+        var visited = new HashSet<string>(_vertices.Count, StringComparer.Ordinal);
+        var recursionStack = new HashSet<string>(_vertices.Count, StringComparer.Ordinal);
 
         foreach (var vertex in _vertices)
         {
@@ -81,7 +91,7 @@ public class DirectedGraph(bool allowSelfLoops = false)
             {
                 foreach (var (neighbor, transitions) in value)
                 {
-                    if (transitions.All(static transition => transition.IsReentrant))
+                    if (ContainsOnlyReentrantTransitions(transitions))
                     {
                         continue;
                     }
@@ -120,7 +130,7 @@ public class DirectedGraph(bool allowSelfLoops = false)
     public bool HasVertex(string vertex) => _vertices.Contains(vertex);
 
     public bool HasEdge(string source, string target) =>
-        _adjacencyList.ContainsKey(source) && _adjacencyList[source].ContainsKey(target);
+        _adjacencyList.TryGetValue(source, out var targets) && targets.ContainsKey(target);
 
     public bool HasReentrantTransition(string source, string target)
     {
@@ -134,11 +144,32 @@ public class DirectedGraph(bool allowSelfLoops = false)
             return false;
         }
 
-        return transitions.Any(static transition => transition.IsReentrant);
+        foreach (var transition in transitions)
+        {
+            if (transition.IsReentrant)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public IEnumerable<string> GetVertices() => _vertices;
 
     public IEnumerable<string> GetNeighbors(string vertex) =>
         _adjacencyList.TryGetValue(vertex, out var value) ? value.Keys : Enumerable.Empty<string>();
+
+    private static bool ContainsOnlyReentrantTransitions(HashSet<GrainTransition> transitions)
+    {
+        foreach (var transition in transitions)
+        {
+            if (!transition.IsReentrant)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 }

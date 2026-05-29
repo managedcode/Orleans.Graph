@@ -9,7 +9,7 @@ namespace ManagedCode.Orleans.Graph.Models;
 public class CallHistory
 {
     [Id(0)]
-    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid Id { get; set; }
 
     [Id(1)]
     public Stack<Call> History { get; } = new();

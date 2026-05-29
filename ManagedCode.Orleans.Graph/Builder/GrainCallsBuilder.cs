@@ -11,7 +11,7 @@ public class GrainCallsBuilder(bool allowSelfLoops = true) : IGrainCallsBuilder
 
     public IGrainCallsBuilder AllowClientCallGrain<TGrain>() where TGrain : IGrain
     {
-        AddTransition(Constants.ClientCallerId, typeof(TGrain).FullName!);
+        AddTransition(Constants.ClientCallerId, typeof(TGrain).GetTypeName());
         return this;
     }
 
@@ -24,7 +24,7 @@ public class GrainCallsBuilder(bool allowSelfLoops = true) : IGrainCallsBuilder
 
     public ITransitionBuilder<TGrain> From<TGrain>() where TGrain : IGrain
     {
-        return new TransitionBuilder<TGrain>(this, typeof(TGrain).FullName!);
+        return new TransitionBuilder<TGrain>(this, typeof(TGrain).GetTypeName());
     }
 
     public IMethodBuilder<TGrain, TGrain> AddGrain<TGrain>() where TGrain : IGrain

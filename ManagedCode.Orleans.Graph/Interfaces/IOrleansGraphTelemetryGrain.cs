@@ -4,7 +4,7 @@ namespace ManagedCode.Orleans.Graph.Interfaces;
 
 public interface IOrleansGraphTelemetryGrain : IGrainWithStringKey
 {
-    Task MergeAsync(IReadOnlyCollection<ObservedGrainCall> edges);
+    Task MergeObservedCallsAsync(IReadOnlyCollection<ObservedGrainCall> observedCalls);
 
     Task<ObservedGrainCallGraph> GetObservedGraphAsync();
 
