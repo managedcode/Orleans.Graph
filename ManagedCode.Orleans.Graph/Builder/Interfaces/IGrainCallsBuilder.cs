@@ -21,7 +21,7 @@ public interface IGrainCallsBuilder
     IGrainCallsBuilder AllowClientCallGrain<TGrain>() where TGrain : IGrain;
 
     /// <summary>
-    /// Allows all grain calls.
+    /// Allows unconfigured grain calls while runtime telemetry still records observed transitions for live graph diagnostics.
     /// </summary>
     /// <returns>The current instance of <see cref="IGrainCallsBuilder"/>.</returns>
     IGrainCallsBuilder AllowAll();

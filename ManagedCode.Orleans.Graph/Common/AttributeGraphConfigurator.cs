@@ -1,5 +1,6 @@
 using System.Reflection;
 using ManagedCode.Orleans.Graph.Attributes;
+using ManagedCode.Orleans.Graph.Interfaces;
 
 namespace ManagedCode.Orleans.Graph;
 
@@ -53,7 +54,7 @@ internal static class AttributeGraphConfigurator
 
             if (attribute.AllowAllMethods || (attribute.SourceMethods.Length == 0 && attribute.TargetMethods.Length == 0))
             {
-                builder.AddMethodRule(sourceName, targetName, "*", "*");
+                builder.AddMethodRule(sourceName, targetName, Constants.AnyMethod, Constants.AnyMethod);
             }
             else
             {
@@ -79,7 +80,7 @@ internal static class AttributeGraphConfigurator
         }
 
         builder.AddReentrancy(sourceName, sourceName);
-        builder.AddMethodRule(sourceName, sourceName, "*", "*");
+        builder.AddMethodRule(sourceName, sourceName, Constants.AnyMethod, Constants.AnyMethod);
     }
 
     private static IEnumerable<Type> SafeGetTypes(Assembly assembly)

@@ -1,3 +1,4 @@
+using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
 
 namespace ManagedCode.Orleans.Graph.Tests;
@@ -19,7 +20,7 @@ public class DirectedGraphTests
     public void HasReentrantTransition_ReturnsTrueForSelfLoop()
     {
         var graph = new DirectedGraph(true);
-        graph.AddTransition("source", "source", new GrainTransition("*", "*", IsReentrant: true));
+        graph.AddTransition("source", "source", new GrainTransition(Constants.AnyMethod, Constants.AnyMethod, IsReentrant: true));
 
         graph.HasReentrantTransition("source", "source").ShouldBeTrue();
     }
@@ -28,8 +29,8 @@ public class DirectedGraphTests
     public void AddTransition_AllowsCycleThroughReentrantEdge()
     {
         var graph = new DirectedGraph(true);
-        graph.AddTransition("source", "target", new GrainTransition("*", "*", IsReentrant: true));
-        graph.AddTransition("target", "source", new GrainTransition("*", "*"));
+        graph.AddTransition("source", "target", new GrainTransition(Constants.AnyMethod, Constants.AnyMethod, IsReentrant: true));
+        graph.AddTransition("target", "source", new GrainTransition(Constants.AnyMethod, Constants.AnyMethod));
 
         graph.HasCycle().ShouldBeFalse();
     }

@@ -25,7 +25,7 @@ public static class OrleansClientGraphExtensions
         builder.AddOutgoingGrainCallFilter<GraphOutgoingGrainCallFilter>();
 
         var manager = BuildManager(configureGraph, assemblies);
-        builder.ConfigureServices(services => services.AddSingleton(manager));
+        builder.Services.AddSingleton(manager);
         return builder;
     }
 
@@ -45,7 +45,7 @@ public static class OrleansClientGraphExtensions
         graphBuilder(grainGraph);
         var manager = grainGraph.Build();
 
-        builder.ConfigureServices(services => services.AddSingleton(manager));
+        builder.Services.AddSingleton(manager);
         return builder;
     }
 
@@ -53,7 +53,7 @@ public static class OrleansClientGraphExtensions
     public static IClientBuilder CreateGraphFromAttributes(this IClientBuilder builder, params Assembly[] assemblies)
     {
         var manager = BuildManager(null, assemblies);
-        builder.ConfigureServices(services => services.AddSingleton(manager));
+        builder.Services.AddSingleton(manager);
         return builder;
     }
 }

@@ -31,6 +31,8 @@ Update guidelines:
 - **Graph Transitions**: When extending the fluent builders, preserve existing transition sets—never clear prior rules when adding new ones—so multiple method constraints remain effective.
 - **Call Tracking**: Resolve outgoing call identities from the Orleans context (`SourceId`/interface metadata) instead of guessing via reflection order to avoid mislabelling callers.
 - **Configuration Flags**: Treat `AllowAll`/`DisallowAll` on `GrainCallsBuilder` as authoritative defaults; ensure runtime checks respect the builder’s chosen baseline before reporting violations.
+- **Runtime Graph Telemetry**: For live graph features, have filters report observed calls to stateless worker aggregators that periodically flush to an in-memory grain; do not rely on per-request `CallHistory` alone for a global runtime graph.
+- **Telemetry Filtering**: Do not track Orleans.Graph internal telemetry calls by default; expose a configuration switch to include them, and test both filtered and full-tracking modes.
 - **Testing Scope**: Exercise new behavior through the Orleans-hosted integration tests in `ManagedCode.Orleans.Graph.Tests`, covering both positive and negative paths to mirror real cluster flows.
 - **Test Framework**: Use TUnit for tests and Shouldly for assertions; do not introduce FluentAssertions, so the test style stays aligned with the newer ManagedCode Orleans projects.
 - **Migration Releases**: For major framework/package migrations, complete three strict code-review-and-fix iterations before README polish, feature additions, commit, push, and CI verification, so release branches are hardened before publication.

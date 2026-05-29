@@ -61,7 +61,37 @@ Register the client-side outgoing filter when Orleans clients should participate
 clientBuilder.AddOrleansGraph();
 ```
 
-Use `AllowAll()` only when you want graph rules to document expected traffic without blocking unconfigured transitions.
+## Observe Mode
+
+Use `AllowAll()` when you want to discover real traffic before enforcing a strict policy. In this mode, unconfigured transitions are allowed, but the filters still send observed calls to stateless telemetry workers. Those workers aggregate calls and periodically flush them into an in-memory telemetry grain used by the live graph.
+
+```csharp
+using ManagedCode.Orleans.Graph.Extensions;
+using ManagedCode.Orleans.Graph.Interfaces;
+
+siloBuilder.AddOrleansGraph(
+    configureFilters: filters =>
+    {
+        filters.LiveGraphFlushPeriod = TimeSpan.FromSeconds(1);
+    },
+    configureGraph: graph =>
+    {
+        graph.AllowAll();
+    });
+
+clientBuilder.AddOrleansGraph();
+```
+
+After your app receives traffic, read the observed graph from the telemetry grain.
+
+```csharp
+var telemetry = grainFactory.GetGrain<IOrleansGraphTelemetryGrain>(Constants.LiveGraphTelemetryGrainKey);
+
+var observedEdges = await telemetry.GetEdgesAsync();
+var liveMermaidDiagram = await telemetry.GenerateMermaidDiagramAsync();
+```
+
+`AllowAll()` is not required for live telemetry. It only changes enforcement behavior: missing transitions are allowed instead of blocked. Orleans.Graph internal telemetry calls are excluded by default so the graph shows application traffic. Set `TrackOrleansGraphInternalCalls = true` only when debugging the telemetry pipeline itself.
 
 ## Attribute Setup
 
@@ -90,13 +120,19 @@ public interface IPaymentGrain : IGrainWithStringKey
 
 ## Diagnostics
 
-Generate configured-policy and live-call Mermaid diagrams.
+Generate configured-policy and live-call Mermaid diagrams. The live graph is also available from the in-memory telemetry grain populated by the filters.
 
 ```csharp
 var manager = serviceProvider.GetRequiredService<GrainTransitionManager>();
 
 var policyDiagram = manager.GeneratePolicyMermaidDiagram();
 var liveDiagram = manager.GenerateLiveMermaidDiagram(callHistory);
+```
+
+```csharp
+var telemetry = grainFactory.GetGrain<IOrleansGraphTelemetryGrain>(Constants.LiveGraphTelemetryGrainKey);
+var liveEdges = await telemetry.GetEdgesAsync();
+var liveGraph = await telemetry.GenerateMermaidDiagramAsync();
 ```
 
 Inspect the configured policy without parsing Mermaid.

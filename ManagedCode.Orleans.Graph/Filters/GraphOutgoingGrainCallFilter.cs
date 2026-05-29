@@ -12,8 +12,11 @@ public class GraphOutgoingGrainCallFilter(IServiceProvider serviceProvider, Grap
     {
         if (context.TrackOutgoingCall(graphCallFilterConfig))
         {
-            GraphManager?.IsTransitionAllowed(context.GetCallHistory(), true);
-            GraphManager?.DetectDeadlocks(context.GetCallHistory(), true);
+            if (!context.IsOrleansGraphTelemetryCall())
+            {
+                GraphManager?.IsTransitionAllowed(context.GetCallHistory(), true);
+                GraphManager?.DetectDeadlocks(context.GetCallHistory(), true);
+            }
         }
 
         return context.Invoke();

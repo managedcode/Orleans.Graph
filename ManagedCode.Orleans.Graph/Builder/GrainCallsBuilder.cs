@@ -56,7 +56,7 @@ public class GrainCallsBuilder(bool allowSelfLoops = true) : IGrainCallsBuilder
 
     internal void AddTransition(string source, string target)
     {
-        _graph.AddTransition(source, target, new GrainTransition("*", "*"));
+        _graph.AddTransition(source, target, new GrainTransition(Constants.AnyMethod, Constants.AnyMethod));
     }
 
     internal void AddMethodRule(string source, string target, string sourceMethod, string targetMethod)
@@ -66,7 +66,7 @@ public class GrainCallsBuilder(bool allowSelfLoops = true) : IGrainCallsBuilder
 
     internal void AddReentrancy(string source, string target)
     {
-        _graph.AddTransition(source, target, new GrainTransition("*", "*", IsReentrant: true));
+        _graph.AddTransition(source, target, new GrainTransition(Constants.AnyMethod, Constants.AnyMethod, IsReentrant: true));
     }
 
     public GrainTransitionManager Build()

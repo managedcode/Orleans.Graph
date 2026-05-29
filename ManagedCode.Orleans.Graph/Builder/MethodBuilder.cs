@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using ManagedCode.Orleans.Graph.Interfaces;
 
 namespace ManagedCode.Orleans.Graph;
 
@@ -35,7 +36,7 @@ public class MethodBuilder<TSource, TTarget>(GrainCallsBuilder parent, string so
 
     public IMethodBuilder<TSource, TTarget> AllMethods()
     {
-        _parent.AddMethodRule(_sourceType, _targetType, "*", "*");
+        _parent.AddMethodRule(_sourceType, _targetType, Constants.AnyMethod, Constants.AnyMethod);
         return this;
     }
 
@@ -67,7 +68,7 @@ public class MethodBuilder<TSource, TTarget>(GrainCallsBuilder parent, string so
     {
         foreach (var targetMethod in targetMethods)
         {
-            _parent.AddMethodRule(_sourceType, _targetType, "*", targetMethod);
+            _parent.AddMethodRule(_sourceType, _targetType, Constants.AnyMethod, targetMethod);
         }
         return this;
     }
@@ -76,7 +77,7 @@ public class MethodBuilder<TSource, TTarget>(GrainCallsBuilder parent, string so
     {
         foreach (var sourceMethod in sourceMethods)
         {
-            _parent.AddMethodRule(_sourceType, _targetType, sourceMethod, "*");
+            _parent.AddMethodRule(_sourceType, _targetType, sourceMethod, Constants.AnyMethod);
         }
         return this;
     }

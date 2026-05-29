@@ -8,7 +8,6 @@ public static class RequestContextHelper
     public static bool TrackIncomingCall(this IIncomingGrainCallContext context)
     {
         var call = context.GetCallHistory();
-        //var caller = context.TargetContext!.GrainInstance!.GetType().Name;
         call.Push(new InCall(context.SourceId, context.TargetId, context.InterfaceName, context.MethodName));
         context.SetCallHistory(call);
         return true;
@@ -26,7 +25,7 @@ public static class RequestContextHelper
 
     public static bool TrackIncomingCall(this IIncomingGrainCallContext context, GraphCallFilterConfig graphCallFilterConfig)
     {
-        if (!graphCallFilterConfig.TrackOrleansCalls && context.ImplementationMethod.Module.Name.StartsWith("Orleans.", StringComparison.Ordinal))
+        if (context.ShouldSkipTracking(graphCallFilterConfig, context.ImplementationMethod.Module.Name))
         {
             return false;
         }
@@ -36,7 +35,7 @@ public static class RequestContextHelper
 
     public static bool TrackOutgoingCall(this IOutgoingGrainCallContext context, GraphCallFilterConfig graphCallFilterConfig)
     {
-        if (!graphCallFilterConfig.TrackOrleansCalls && context.InterfaceMethod.Module.Name.StartsWith("Orleans.", StringComparison.Ordinal))
+        if (context.ShouldSkipTracking(graphCallFilterConfig, context.InterfaceMethod.Module.Name))
         {
             return false;
         }
@@ -57,6 +56,59 @@ public static class RequestContextHelper
     public static void SetCallHistory(this IGrainCallContext context, CallHistory callHistory)
     {
         RequestContext.Set(Constants.RequestContextKey, callHistory);
+    }
+
+    public static bool IsOrleansGraphTelemetryCall(this IGrainCallContext context)
+    {
+        return string.Equals(context.InterfaceName, typeof(IOrleansGraphTelemetryWorker).FullName, StringComparison.Ordinal) ||
+               string.Equals(context.InterfaceName, typeof(IOrleansGraphTelemetryGrain).FullName, StringComparison.Ordinal);
+    }
+
+    public static bool IsTelemetrySuppressed()
+    {
+        return RequestContext.Get(Constants.TelemetrySuppressionContextKey) is true;
+    }
+
+    public static async Task RunWithTelemetrySuppressedAsync(Func<Task> action)
+    {
+        var previous = RequestContext.Get(Constants.TelemetrySuppressionContextKey);
+        RequestContext.Set(Constants.TelemetrySuppressionContextKey, true);
+
+        try
+        {
+            await action();
+        }
+        finally
+        {
+            if (previous is null)
+            {
+                RequestContext.Remove(Constants.TelemetrySuppressionContextKey);
+            }
+            else
+            {
+                RequestContext.Set(Constants.TelemetrySuppressionContextKey, previous);
+            }
+        }
+    }
+
+    private static bool ShouldSkipTracking(this IGrainCallContext context, GraphCallFilterConfig graphCallFilterConfig, string moduleName)
+    {
+        if (!graphCallFilterConfig.TrackOrleansCalls && moduleName.StartsWith("Orleans.", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        if (!graphCallFilterConfig.TrackOrleansGraphInternalCalls && context.IsOrleansGraphTelemetryCall())
+        {
+            return true;
+        }
+
+        if (!graphCallFilterConfig.TrackOrleansGraphInternalCalls && IsTelemetrySuppressed())
+        {
+            return true;
+        }
+
+        return false;
     }
 
     private static string ResolveCallerInterface(IOutgoingGrainCallContext context)
