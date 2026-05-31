@@ -95,6 +95,10 @@ var liveMermaidDiagram = await telemetry.GenerateLiveMermaidDiagramAsync();
 
 The live telemetry pipeline records one observed edge from the incoming side, after Orleans has both sides of the call pair. The filters send the edge to stateless telemetry workers, workers aggregate repeated calls in memory, and a timer flushes the aggregated counts into the telemetry grain. The timer does not keep stateless workers alive.
 
+Activation-origin calls are attributed to the source grain activation. `RegisterGrainTimer` callbacks do not expose a source grain interface method, so their source method is recorded as `*`. Reminder callbacks are attributed to the source grain identity and keep `ReceiveReminder` as the source method instead of exposing `Orleans.IRemindable` as the graph vertex.
+
+Stateless worker calls follow the same identity rules: grain-interface methods use the worker interface identity, while activation-origin callbacks use the concrete worker activation identity.
+
 Orleans.Graph internal telemetry calls are excluded by default so the graph shows application traffic. Set `TrackOrleansGraphInternalCalls = true` only when debugging the telemetry pipeline itself.
 
 ```csharp
@@ -153,7 +157,7 @@ var liveMermaidGraph = await telemetry.GenerateLiveMermaidDiagramAsync();
 
 `liveGraph.Vertices` contains grain identities. `liveGraph.Edges` contains observed runtime transitions between those vertices, including `SourceMethod`, `TargetMethod`, hit count, and timestamps. The Mermaid API renders the same graph for visualization.
 
-Runtime vertices are exact graph identities. The client is represented as `ORLEANS_GRAIN_CLIENT`; grain vertices use the concrete Orleans grain interface or implementation identity resolved from Orleans call context. The runtime graph does not fall back to the base `Grain` class or wildcard methods when caller identity is required.
+Runtime vertices are exact graph identities. The client is represented as `ORLEANS_GRAIN_CLIENT`; grain vertices use the concrete Orleans grain interface or implementation identity resolved from Orleans call context. When Orleans exposes no resolvable caller identity, the runtime graph records `UNKNOWN_CALLER` instead of guessing. The runtime graph does not fall back to the base `Grain` class. Source methods use `*` only when Orleans does not expose a grain interface method for the source callback.
 
 Inspect the configured policy without parsing Mermaid.
 

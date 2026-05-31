@@ -1,5 +1,6 @@
 using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
+using ManagedCode.Orleans.Graph.Tests.Cluster.Grains;
 using ManagedCode.Orleans.Graph.Tests.Cluster.Grains.Interfaces;
 using ManagedCode.Orleans.Graph.Tests.RuntimeGraphCluster;
 using Microsoft.Extensions.DependencyInjection;
@@ -271,6 +272,163 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
     }
 
     [Test]
+    public async Task AllowAll_TracksTimerOriginatedGrainCallWithoutIncomingCallerContextAsync()
+    {
+        await ResetTelemetryAsync(_fixture.Cluster.Client);
+
+        var grain = _fixture.Cluster.Client.GetGrain<IGrainA>("timer-originated-call");
+        await grain.StartTimerOriginatedCallAsync();
+
+        var result = await WaitForTimerOriginatedCallResultAsync(grain);
+
+        result.ShouldBe(42);
+
+        var observedGraph = await WaitForObservedGraphAsync(_fixture.Cluster.Client, graph =>
+            graph.Edges.Any(edge =>
+                edge.Source == typeof(GrainA).FullName &&
+                edge.Target == typeof(IGrainB).FullName &&
+                edge.SourceMethod == Constants.AnyMethod &&
+                edge.TargetMethod == nameof(IGrainB.MethodB1)));
+
+        observedGraph.Edges.ShouldContain(edge =>
+            edge.Source == typeof(GrainA).FullName &&
+            edge.Target == typeof(IGrainB).FullName &&
+            edge.SourceMethod == Constants.AnyMethod &&
+            edge.TargetMethod == nameof(IGrainB.MethodB1),
+            FormatObservedEdges(observedGraph.Edges));
+        observedGraph.Edges.Any(IsBaseGrainEdge).ShouldBeFalse();
+    }
+
+    [Test]
+    public async Task AllowAll_TracksReminderOriginatedGrainCallWithoutIncomingCallerContextAsync()
+    {
+        await ResetTelemetryAsync(_fixture.Cluster.Client);
+
+        var grain = _fixture.Cluster.Client.GetGrain<IGrainA>("reminder-originated-call");
+        await grain.StartReminderOriginatedCallAsync();
+
+        var result = await WaitForReminderOriginatedCallResultAsync(grain);
+
+        result.ShouldBe(42);
+
+        var observedGraph = await WaitForObservedGraphAsync(_fixture.Cluster.Client, graph =>
+            graph.Edges.Any(edge =>
+                edge.Source == typeof(GrainA).FullName &&
+                edge.Target == typeof(IGrainB).FullName &&
+                edge.SourceMethod == nameof(IRemindable.ReceiveReminder) &&
+                edge.TargetMethod == nameof(IGrainB.MethodB1)));
+
+        observedGraph.Edges.ShouldContain(edge =>
+            edge.Source == typeof(GrainA).FullName &&
+            edge.Target == typeof(IGrainB).FullName &&
+            edge.SourceMethod == nameof(IRemindable.ReceiveReminder) &&
+            edge.TargetMethod == nameof(IGrainB.MethodB1),
+            FormatObservedEdges(observedGraph.Edges));
+        observedGraph.Edges.Any(IsBaseGrainEdge).ShouldBeFalse();
+    }
+
+    [Test]
+    public async Task AllowAll_TracksStatelessWorkerGrainCallAsync()
+    {
+        await ResetTelemetryAsync(_fixture.Cluster.Client);
+
+        var result = await _fixture.Cluster.Client
+            .GetGrain<IStatelessWorkerCallerGrain>("stateless-worker-call")
+            .CallGrainBAsync(41);
+
+        result.ShouldBe(42);
+
+        var observedGraph = await WaitForObservedGraphAsync(_fixture.Cluster.Client, graph =>
+            graph.Edges.Any(edge =>
+                edge.Source == typeof(IStatelessWorkerCallerGrain).FullName &&
+                edge.Target == typeof(IGrainB).FullName &&
+                edge.SourceMethod == nameof(IStatelessWorkerCallerGrain.CallGrainBAsync) &&
+                edge.TargetMethod == nameof(IGrainB.MethodB1)));
+
+        observedGraph.Edges.ShouldContain(edge =>
+            edge.Source == typeof(IStatelessWorkerCallerGrain).FullName &&
+            edge.Target == typeof(IGrainB).FullName &&
+            edge.SourceMethod == nameof(IStatelessWorkerCallerGrain.CallGrainBAsync) &&
+            edge.TargetMethod == nameof(IGrainB.MethodB1),
+            FormatObservedEdges(observedGraph.Edges));
+        observedGraph.Edges.Any(IsBaseGrainEdge).ShouldBeFalse();
+    }
+
+    [Test]
+    public async Task AllowAll_TracksStatelessWorkerLoadAcrossMultipleActivationsAsync()
+    {
+        const int callCount = 500;
+        const int minimumActivationCount = 4;
+        const int workerDelayMilliseconds = 200;
+        await ResetTelemetryAsync(_fixture.Cluster.Client);
+
+        var grain = _fixture.Cluster.Client.GetGrain<IStatelessWorkerCallerGrain>("stateless-worker-load");
+        var calls = Enumerable.Range(0, callCount)
+            .Select(input => grain.CallGrainBWithActivationAsync(input, workerDelayMilliseconds))
+            .ToArray();
+
+        var results = await Task.WhenAll(calls);
+        var activationIds = results
+            .Select(static result => result.ActivationId)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+
+        results
+            .Select(static result => result.Value)
+            .OrderBy(static value => value)
+            .ShouldBe(Enumerable.Range(1, callCount).ToArray());
+        activationIds.Length.ShouldBeGreaterThanOrEqualTo(
+            minimumActivationCount,
+            string.Join(Environment.NewLine, activationIds));
+
+        var observedGraph = await WaitForObservedGraphAsync(_fixture.Cluster.Client, graph =>
+            graph.Edges.Any(edge =>
+                edge.Source == typeof(IStatelessWorkerCallerGrain).FullName &&
+                edge.Target == typeof(IGrainB).FullName &&
+                edge.SourceMethod == nameof(IStatelessWorkerCallerGrain.CallGrainBWithActivationAsync) &&
+                edge.TargetMethod == nameof(IGrainB.MethodB1) &&
+                edge.Count == callCount));
+
+        observedGraph.Edges.ShouldContain(edge =>
+            edge.Source == typeof(IStatelessWorkerCallerGrain).FullName &&
+            edge.Target == typeof(IGrainB).FullName &&
+            edge.SourceMethod == nameof(IStatelessWorkerCallerGrain.CallGrainBWithActivationAsync) &&
+            edge.TargetMethod == nameof(IGrainB.MethodB1) &&
+            edge.Count == callCount,
+            FormatObservedEdges(observedGraph.Edges));
+        observedGraph.Edges.Any(IsBaseGrainEdge).ShouldBeFalse();
+        observedGraph.Edges.Any(IsUnknownCallerEdge).ShouldBeFalse();
+    }
+
+    [Test]
+    public async Task AllowAll_TracksStatelessWorkerTimerOriginatedGrainCallWithoutIncomingCallerContextAsync()
+    {
+        await ResetTelemetryAsync(_fixture.Cluster.Client);
+
+        var grain = _fixture.Cluster.Client.GetGrain<IStatelessWorkerCallerGrain>("stateless-worker-timer-originated-call");
+        await grain.StartTimerOriginatedCallAsync();
+
+        var result = await WaitForStatelessWorkerTimerOriginatedCallResultAsync(grain);
+
+        result.ShouldBe(42);
+
+        var observedGraph = await WaitForObservedGraphAsync(_fixture.Cluster.Client, graph =>
+            graph.Edges.Any(edge =>
+                edge.Source == typeof(StatelessWorkerCallerGrain).FullName &&
+                edge.Target == typeof(IGrainB).FullName &&
+                edge.SourceMethod == Constants.AnyMethod &&
+                edge.TargetMethod == nameof(IGrainB.MethodB1)));
+
+        observedGraph.Edges.ShouldContain(edge =>
+            edge.Source == typeof(StatelessWorkerCallerGrain).FullName &&
+            edge.Target == typeof(IGrainB).FullName &&
+            edge.SourceMethod == Constants.AnyMethod &&
+            edge.TargetMethod == nameof(IGrainB.MethodB1),
+            FormatObservedEdges(observedGraph.Edges));
+        observedGraph.Edges.Any(IsBaseGrainEdge).ShouldBeFalse();
+    }
+
+    [Test]
     public async Task Telemetry_DoesNotTrackOrleansGraphInternalCallsByDefaultAsync()
     {
         await ResetTelemetryAsync(_fixture.Cluster.Client);
@@ -308,6 +466,72 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
         return graph.Edges;
     }
 
+    private static async Task<int?> WaitForTimerOriginatedCallResultAsync(IGrainA grain)
+    {
+        for (var attempt = 0; attempt < 50; attempt++)
+        {
+            var failure = await grain.GetTimerOriginatedCallFailureAsync();
+            failure.ShouldBeNull();
+
+            var result = await grain.GetTimerOriginatedCallResultAsync();
+            if (result.HasValue)
+            {
+                return result;
+            }
+
+            await Task.Delay(100);
+        }
+
+        var finalFailure = await grain.GetTimerOriginatedCallFailureAsync();
+        finalFailure.ShouldBeNull();
+
+        return await grain.GetTimerOriginatedCallResultAsync();
+    }
+
+    private static async Task<int?> WaitForReminderOriginatedCallResultAsync(IGrainA grain)
+    {
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            var failure = await grain.GetReminderOriginatedCallFailureAsync();
+            failure.ShouldBeNull();
+
+            var result = await grain.GetReminderOriginatedCallResultAsync();
+            if (result.HasValue)
+            {
+                return result;
+            }
+
+            await Task.Delay(100);
+        }
+
+        var finalFailure = await grain.GetReminderOriginatedCallFailureAsync();
+        finalFailure.ShouldBeNull();
+
+        return await grain.GetReminderOriginatedCallResultAsync();
+    }
+
+    private static async Task<int?> WaitForStatelessWorkerTimerOriginatedCallResultAsync(IStatelessWorkerCallerGrain grain)
+    {
+        for (var attempt = 0; attempt < 50; attempt++)
+        {
+            var failure = await grain.GetTimerOriginatedCallFailureAsync();
+            failure.ShouldBeNull();
+
+            var result = await grain.GetTimerOriginatedCallResultAsync();
+            if (result.HasValue)
+            {
+                return result;
+            }
+
+            await Task.Delay(100);
+        }
+
+        var finalFailure = await grain.GetTimerOriginatedCallFailureAsync();
+        finalFailure.ShouldBeNull();
+
+        return await grain.GetTimerOriginatedCallResultAsync();
+    }
+
     private static async Task<ObservedGrainCallGraph> WaitForObservedGraphAsync(
         IGrainFactory grainFactory,
         Func<ObservedGrainCallGraph, bool> predicate)
@@ -326,6 +550,13 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
         }
 
         return await telemetry.GetObservedGraphAsync();
+    }
+
+    private static string FormatObservedEdges(IReadOnlyCollection<ObservedGrainCall> edges)
+    {
+        return string.Join(
+            Environment.NewLine,
+            edges.Select(edge => $"{edge.Source}.{edge.SourceMethod} -> {edge.Target}.{edge.TargetMethod} ({edge.Count})"));
     }
 
     private static void AssertExpectedCalls(
@@ -474,6 +705,12 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
     private static bool IsBaseGrainEdge(ObservedGrainCall edge)
     {
         return IsBaseGrainEndpoint(edge.Source) || IsBaseGrainEndpoint(edge.Target);
+    }
+
+    private static bool IsUnknownCallerEdge(ObservedGrainCall edge)
+    {
+        return string.Equals(edge.Source, Constants.UnknownCallerId, StringComparison.Ordinal) ||
+               string.Equals(edge.Target, Constants.UnknownCallerId, StringComparison.Ordinal);
     }
 
     private static bool IsBaseGrainEndpoint(string endpoint)

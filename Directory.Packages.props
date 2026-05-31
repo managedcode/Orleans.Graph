@@ -13,6 +13,7 @@
     <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.6.0" />
     <PackageVersion Include="Microsoft.Orleans.Analyzers" Version="10.1.0" />
     <PackageVersion Include="Microsoft.Orleans.Client" Version="10.1.0" />
+    <PackageVersion Include="Microsoft.Orleans.Reminders" Version="10.1.0" />
     <PackageVersion Include="Microsoft.Orleans.Runtime" Version="10.1.0" />
     <PackageVersion Include="Microsoft.Orleans.Sdk" Version="10.1.0" />
     <PackageVersion Include="Microsoft.Orleans.Serialization" Version="10.1.0" />

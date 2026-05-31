@@ -193,11 +193,53 @@ public static class RequestContextHelper
             IsValidGrainIdentity(callerContext.Caller) &&
             !string.IsNullOrWhiteSpace(callerContext.Method))
         {
+            if (IsActivationCallbackCaller(callerContext.Caller))
+            {
+                var callbackCaller = ResolveSourceContextCaller(context, callerContext.Method);
+                if (callbackCaller.HasValue)
+                {
+                    return callbackCaller.Value;
+                }
+            }
+
             return callerContext;
         }
 
-        throw new InvalidOperationException(
-            $"Unable to resolve caller grain interface for outgoing call to {context.InterfaceName}.{context.MethodName}.");
+        var sourceCaller = ResolveSourceContextCaller(context, Constants.AnyMethod);
+        if (sourceCaller.HasValue)
+        {
+            return sourceCaller.Value;
+        }
+
+        return new CurrentCallerContext(Constants.UnknownCallerId, Constants.AnyMethod);
+    }
+
+    private static CurrentCallerContext? ResolveSourceContextCaller(IOutgoingGrainCallContext context, string method)
+    {
+        var sourceContext = context.SourceContext;
+        if (sourceContext is null)
+        {
+            return null;
+        }
+
+        var sourceImplementation = sourceContext.GrainInstance?.GetType().FullName;
+        if (sourceImplementation is not null && IsValidGrainIdentity(sourceImplementation))
+        {
+            return new CurrentCallerContext(sourceImplementation, method);
+        }
+
+        var sourceInterface = sourceContext.GrainReference.InterfaceName;
+        if (IsValidGrainIdentity(sourceInterface))
+        {
+            return new CurrentCallerContext(sourceInterface, method);
+        }
+
+        return null;
+    }
+
+    private static bool IsActivationCallbackCaller(string caller)
+    {
+        return string.Equals(caller, typeof(IRemindable).FullName, StringComparison.Ordinal);
     }
 
     private static void SetCurrentCaller(string caller, string method)
@@ -227,13 +269,13 @@ public static class RequestContextHelper
             $"Resolved Orleans graph identity for {grainType}.{method} is not a concrete grain interface or implementation type.");
     }
 
-    private static bool IsBaseGrainType(string grainType)
+    private static bool IsBaseGrainType(string? grainType)
     {
         return string.Equals(grainType, nameof(Grain), StringComparison.Ordinal) ||
                string.Equals(grainType, typeof(Grain).FullName, StringComparison.Ordinal);
     }
 
-    private static bool IsValidGrainIdentity(string grainType)
+    private static bool IsValidGrainIdentity(string? grainType)
     {
         return !string.IsNullOrWhiteSpace(grainType) && !IsBaseGrainType(grainType);
     }

@@ -12,4 +12,16 @@ public interface IGrainA : IGrainWithStringKey
     Task<int> MethodComplexFlow(int input);
 
     Task<int> MethodGrainOnlyComplexFlow(int input);
+
+    Task StartTimerOriginatedCallAsync();
+
+    Task<int?> GetTimerOriginatedCallResultAsync();
+
+    Task<string?> GetTimerOriginatedCallFailureAsync();
+
+    Task StartReminderOriginatedCallAsync();
+
+    Task<int?> GetReminderOriginatedCallResultAsync();
+
+    Task<string?> GetReminderOriginatedCallFailureAsync();
 }

@@ -7,6 +7,14 @@ public class TestRuntimeGraphSiloConfigurations : ISiloConfigurator
 {
     public void Configure(ISiloBuilder siloBuilder)
     {
+        siloBuilder.UseInMemoryReminderService();
+        siloBuilder.Configure<ReminderOptions>(options =>
+        {
+            options.MinimumReminderPeriod = TimeSpan.FromMilliseconds(100);
+            options.RefreshReminderListPeriod = TimeSpan.FromMilliseconds(100);
+            options.InitializationTimeout = TimeSpan.FromSeconds(5);
+        });
+
         siloBuilder.AddOrleansGraph(
             configureFilters: filters =>
             {
