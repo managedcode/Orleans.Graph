@@ -7,8 +7,8 @@ namespace ManagedCode.Orleans.Graph.Tests.Cluster.Grains;
 public class StatelessWorkerCallerGrain : Grain, IStatelessWorkerCallerGrain
 {
     private const int TimerOriginatedCallInput = 41;
-    private static readonly TimeSpan TimerOriginatedCallDueTime = TimeSpan.FromMilliseconds(25);
-    private static readonly TimeSpan TimerOriginatedCallPeriod = Timeout.InfiniteTimeSpan;
+    private static readonly TimeSpan _timerOriginatedCallDueTime = TimeSpan.FromMilliseconds(25);
+    private static readonly TimeSpan _timerOriginatedCallPeriod = Timeout.InfiniteTimeSpan;
     private IGrainTimer? _timerOriginatedCall;
 
     public async Task<int> CallGrainBAsync(int input)
@@ -36,8 +36,8 @@ public class StatelessWorkerCallerGrain : Grain, IStatelessWorkerCallerGrain
             RunTimerOriginatedCallAsync,
             new GrainTimerCreationOptions
             {
-                DueTime = TimerOriginatedCallDueTime,
-                Period = TimerOriginatedCallPeriod,
+                DueTime = _timerOriginatedCallDueTime,
+                Period = _timerOriginatedCallPeriod,
                 Interleave = true,
                 KeepAlive = false
             });

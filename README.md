@@ -74,7 +74,7 @@ using ManagedCode.Orleans.Graph.Interfaces;
 siloBuilder.AddOrleansGraph(
     configureFilters: filters =>
     {
-        filters.LiveGraphFlushPeriod = TimeSpan.FromSeconds(1);
+        filters.LiveGraphFlushPeriod = TimeSpan.FromSeconds(30);
     },
     configureGraph: graph =>
     {
@@ -93,7 +93,7 @@ var observedGraph = await telemetry.GetObservedGraphAsync();
 var liveMermaidDiagram = await telemetry.GenerateLiveMermaidDiagramAsync();
 ```
 
-The live telemetry pipeline records one observed edge from the incoming side, after Orleans has both sides of the call pair. The filters send the edge to stateless telemetry workers, workers aggregate repeated calls in memory, and a timer flushes the aggregated counts into the telemetry grain. The timer does not keep stateless workers alive.
+The live telemetry pipeline records one observed edge from the incoming side, after Orleans has both sides of the call pair. The filters send the edge to stateless telemetry workers, workers aggregate repeated calls in memory, and a timer flushes the aggregated counts into the telemetry grain. The default flush period is 30 seconds, and callers can lower it when they need more responsive live diagrams. The timer does not keep stateless workers alive; when a worker is collected, it flushes any buffered calls during deactivation.
 
 Activation-origin calls are attributed to the source grain activation. `RegisterGrainTimer` callbacks do not expose a source grain interface method, so their source method is recorded as `*`. Reminder callbacks are attributed to the source grain identity and keep `ReceiveReminder` as the source method instead of exposing `Orleans.IRemindable` as the graph vertex.
 

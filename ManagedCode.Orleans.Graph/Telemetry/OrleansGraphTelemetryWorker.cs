@@ -9,14 +9,13 @@ namespace ManagedCode.Orleans.Graph.Telemetry;
 [StatelessWorker(1)]
 public sealed class OrleansGraphTelemetryWorker(GraphCallFilterConfig graphCallFilterConfig) : Grain, IOrleansGraphTelemetryWorker, IObservedGrainCallSink
 {
-    private static readonly TimeSpan _defaultFlushPeriod = TimeSpan.FromSeconds(1);
     private readonly Dictionary<ObservedGrainCallKey, ObservedGrainCallAccumulator> _observedCalls = new();
 
     public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
         var flushPeriod = graphCallFilterConfig.LiveGraphFlushPeriod > TimeSpan.Zero
             ? graphCallFilterConfig.LiveGraphFlushPeriod
-            : _defaultFlushPeriod;
+            : GraphCallFilterConfig.DefaultLiveGraphFlushPeriod;
 
         this.RegisterGrainTimer(
             FlushTimerAsync,
@@ -29,6 +28,11 @@ public sealed class OrleansGraphTelemetryWorker(GraphCallFilterConfig graphCallF
             });
 
         return Task.CompletedTask;
+    }
+
+    public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
+    {
+        return FlushBufferedCallsAsync(deactivateWhenEmpty: false);
     }
 
     public Task RecordObservedCallsAsync(IReadOnlyCollection<ObservedGrainCall> observedCalls)
@@ -45,10 +49,20 @@ public sealed class OrleansGraphTelemetryWorker(GraphCallFilterConfig graphCallF
         return Task.CompletedTask;
     }
 
-    public async Task FlushAsync()
+    public Task FlushAsync()
+    {
+        return FlushBufferedCallsAsync(deactivateWhenEmpty: true);
+    }
+
+    private async Task FlushBufferedCallsAsync(bool deactivateWhenEmpty)
     {
         if (_observedCalls.Count == 0)
         {
+            if (deactivateWhenEmpty)
+            {
+                DeactivateOnIdle();
+            }
+
             return;
         }
 

@@ -8,10 +8,10 @@ public class GrainA : Grain, IGrainA, IRemindable
     private const int TimerOriginatedCallInput = 41;
     private const int ReminderOriginatedCallInput = 41;
     private const string ReminderOriginatedCallName = "reminder-originated-call";
-    private static readonly TimeSpan TimerOriginatedCallDueTime = TimeSpan.FromMilliseconds(25);
-    private static readonly TimeSpan TimerOriginatedCallPeriod = Timeout.InfiniteTimeSpan;
-    private static readonly TimeSpan ReminderOriginatedCallDueTime = TimeSpan.FromMilliseconds(100);
-    private static readonly TimeSpan ReminderOriginatedCallPeriod = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan _timerOriginatedCallDueTime = TimeSpan.FromMilliseconds(25);
+    private static readonly TimeSpan _timerOriginatedCallPeriod = Timeout.InfiniteTimeSpan;
+    private static readonly TimeSpan _reminderOriginatedCallDueTime = TimeSpan.FromMilliseconds(100);
+    private static readonly TimeSpan _reminderOriginatedCallPeriod = TimeSpan.FromSeconds(1);
     private IGrainTimer? _timerOriginatedCall;
     private int? _timerOriginatedCallResult;
     private string? _timerOriginatedCallFailure;
@@ -63,8 +63,8 @@ public class GrainA : Grain, IGrainA, IRemindable
             RunTimerOriginatedCallAsync,
             new GrainTimerCreationOptions
             {
-                DueTime = TimerOriginatedCallDueTime,
-                Period = TimerOriginatedCallPeriod,
+                DueTime = _timerOriginatedCallDueTime,
+                Period = _timerOriginatedCallPeriod,
                 Interleave = true,
                 KeepAlive = false
             });
@@ -91,8 +91,8 @@ public class GrainA : Grain, IGrainA, IRemindable
 
         await this.RegisterOrUpdateReminder(
             ReminderOriginatedCallName,
-            ReminderOriginatedCallDueTime,
-            ReminderOriginatedCallPeriod);
+            _reminderOriginatedCallDueTime,
+            _reminderOriginatedCallPeriod);
     }
 
     public Task<int?> GetReminderOriginatedCallResultAsync()

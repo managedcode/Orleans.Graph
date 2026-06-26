@@ -8,12 +8,6 @@ public sealed class OrleansGraphTelemetryGrain : Grain, IOrleansGraphTelemetryGr
 {
     private readonly Dictionary<ObservedGrainCallKey, ObservedGrainCallAccumulator> _observedCalls = new();
 
-    public override Task OnActivateAsync(CancellationToken cancellationToken)
-    {
-        DelayDeactivation(Timeout.InfiniteTimeSpan);
-        return Task.CompletedTask;
-    }
-
     public Task MergeObservedCallsAsync(IReadOnlyCollection<ObservedGrainCall> observedCalls)
     {
         ArgumentNullException.ThrowIfNull(observedCalls);
@@ -24,19 +18,32 @@ public sealed class OrleansGraphTelemetryGrain : Grain, IOrleansGraphTelemetryGr
 
     public Task<ObservedGrainCallGraph> GetObservedGraphAsync()
     {
-        return Task.FromResult(GrainTransitionManager.BuildObservedGraphFromSnapshot(CreateSnapshot()));
+        var snapshot = CreateSnapshot();
+        DeactivateIfEmpty(snapshot);
+        return Task.FromResult(GrainTransitionManager.BuildObservedGraphFromSnapshot(snapshot));
     }
 
     public Task<string> GenerateLiveMermaidDiagramAsync()
     {
-        var observedGraph = GrainTransitionManager.BuildObservedGraphFromSnapshot(CreateSnapshot());
+        var snapshot = CreateSnapshot();
+        DeactivateIfEmpty(snapshot);
+        var observedGraph = GrainTransitionManager.BuildObservedGraphFromSnapshot(snapshot);
         return Task.FromResult(GrainTransitionManager.GenerateObservedGraphMermaidDiagram(observedGraph));
     }
 
     public Task ClearAsync()
     {
         _observedCalls.Clear();
+        DeactivateOnIdle();
         return Task.CompletedTask;
+    }
+
+    private void DeactivateIfEmpty(ObservedGrainCall[] snapshot)
+    {
+        if (snapshot.Length == 0)
+        {
+            DeactivateOnIdle();
+        }
     }
 
     public void RecordObservedCalls(IReadOnlyCollection<ObservedGrainCall> observedCalls)

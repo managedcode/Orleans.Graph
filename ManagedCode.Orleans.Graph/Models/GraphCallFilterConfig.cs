@@ -5,6 +5,8 @@ namespace ManagedCode.Orleans.Graph.Models;
 [Alias("MC.GraphCallFilterConfig")]
 public class GraphCallFilterConfig
 {
+    public static readonly TimeSpan DefaultLiveGraphFlushPeriod = TimeSpan.FromSeconds(30);
+
     [Id(0)]
     public bool TrackOrleansCalls { get; set; } = false;
 
@@ -12,5 +14,5 @@ public class GraphCallFilterConfig
     public bool TrackOrleansGraphInternalCalls { get; set; } = false;
 
     [Id(2)]
-    public TimeSpan LiveGraphFlushPeriod { get; set; } = TimeSpan.FromSeconds(1);
+    public TimeSpan LiveGraphFlushPeriod { get; set; } = DefaultLiveGraphFlushPeriod;
 }

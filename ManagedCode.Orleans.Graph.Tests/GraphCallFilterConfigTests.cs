@@ -11,7 +11,7 @@ public class GraphCallFilterConfigTests
 
         config.TrackOrleansCalls.ShouldBeFalse();
         config.TrackOrleansGraphInternalCalls.ShouldBeFalse();
-        config.LiveGraphFlushPeriod.ShouldBeGreaterThan(TimeSpan.Zero);
+        config.LiveGraphFlushPeriod.ShouldBe(TimeSpan.FromSeconds(30));
     }
 
     [Test]
