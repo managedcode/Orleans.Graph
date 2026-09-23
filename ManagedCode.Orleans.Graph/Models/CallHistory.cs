@@ -19,6 +19,20 @@ public class CallHistory
         History.Push(call);
     }
 
+    public CallHistory Fork(bool detach = false)
+    {
+        var branch = new CallHistory { Id = Id };
+        if (!detach)
+        {
+            foreach (var call in History.Reverse())
+            {
+                branch.Push(call);
+            }
+        }
+
+        return branch;
+    }
+
     public bool IsEmpty()
     {
         return History.Count == 0;

@@ -13,6 +13,10 @@ public interface IGrainA : IGrainWithStringKey
 
     Task<int> MethodGrainOnlyComplexFlow(int input);
 
+    Task<int[]> ObserveParallelCallHistoryAsync(int calls);
+
+    Task StartOneWayHistoryProbeAsync();
+
     Task StartTimerOriginatedCallAsync();
 
     Task<int?> GetTimerOriginatedCallResultAsync();

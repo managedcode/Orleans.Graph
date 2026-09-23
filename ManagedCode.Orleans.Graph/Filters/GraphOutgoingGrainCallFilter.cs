@@ -1,4 +1,5 @@
 using ManagedCode.Orleans.Graph.Extensions;
+using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -8,18 +9,32 @@ public class GraphOutgoingGrainCallFilter(IServiceProvider serviceProvider, Grap
 {
     private readonly GrainTransitionManager? _graphManager = serviceProvider.GetService<GrainTransitionManager>();
 
-    public Task Invoke(IOutgoingGrainCallContext context)
+    public async Task Invoke(IOutgoingGrainCallContext context)
     {
-        if (context.TrackOutgoingCall(graphCallFilterConfig))
+        var previous = RequestContext.Get(Constants.RequestContextKey);
+        if (previous is CallHistory parentHistory)
         {
-            if (!context.IsOrleansGraphTelemetryCall())
+            RequestContext.Set(Constants.RequestContextKey, parentHistory.Fork());
+        }
+
+        try
+        {
+            if (context.TrackOutgoingCall(graphCallFilterConfig) &&
+                !context.IsOrleansGraphTelemetryCall())
             {
                 var callHistory = context.GetCallHistory();
                 _graphManager?.DetectLatestDeadlock(callHistory, true);
                 _graphManager?.IsLatestTransitionAllowed(callHistory, true);
             }
-        }
 
-        return context.Invoke();
+            await context.Invoke();
+        }
+        finally
+        {
+            if (previous is CallHistory)
+            {
+                RequestContext.Set(Constants.RequestContextKey, previous);
+            }
+        }
     }
 }

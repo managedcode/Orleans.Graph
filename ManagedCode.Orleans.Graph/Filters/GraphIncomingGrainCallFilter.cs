@@ -3,6 +3,7 @@ using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
 using ManagedCode.Orleans.Graph.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Concurrency;
 
 namespace ManagedCode.Orleans.Graph.Filters;
 
@@ -15,6 +16,9 @@ public class GraphIncomingGrainCallFilter(IServiceProvider serviceProvider, Grap
     {
         var currentCaller = RequestContextHelper.CaptureCurrentCaller();
         var tracked = context.TrackIncomingCall(graphCallFilterConfig);
+        var previousHistory = RequestContext.Get(Constants.RequestContextKey);
+        var detachOneWay = context.InterfaceMethod.IsDefined(typeof(OneWayAttribute), inherit: true) &&
+                           previousHistory is CallHistory;
 
         try
         {
@@ -30,10 +34,20 @@ public class GraphIncomingGrainCallFilter(IServiceProvider serviceProvider, Grap
                 await ReportObservedEdgeAsync(context, callHistory);
             }
 
+            if (detachOneWay)
+            {
+                RequestContext.Set(Constants.RequestContextKey, ((CallHistory)previousHistory!).Fork(detach: true));
+            }
+
             await context.Invoke();
         }
         finally
         {
+            if (detachOneWay)
+            {
+                RequestContext.Set(Constants.RequestContextKey, previousHistory!);
+            }
+
             if (tracked)
             {
                 RequestContextHelper.RestoreCurrentCaller(currentCaller);

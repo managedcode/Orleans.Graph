@@ -447,7 +447,8 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
 
     private IGrainFactory GetPrimarySiloGrainFactory()
     {
-        var serviceProvider = _fixture.Cluster.GetSiloServiceProvider(_fixture.Cluster.Primary.SiloAddress);
+        var primary = _fixture.Cluster.Primary ?? throw new InvalidOperationException("The primary test silo is unavailable.");
+        var serviceProvider = _fixture.Cluster.GetSiloServiceProvider(primary.SiloAddress);
         return serviceProvider.GetRequiredService<IGrainFactory>();
     }
 

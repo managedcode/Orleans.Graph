@@ -53,6 +53,20 @@ public class GrainA : Grain, IGrainA, IRemindable
         return await RunBranchingFlowAsync(input);
     }
 
+    public async Task<int[]> ObserveParallelCallHistoryAsync(int calls)
+    {
+        var grain = GrainFactory.GetGrain<IGrainB>(this.GetPrimaryKeyString());
+        return await Task.WhenAll(Enumerable.Range(0, calls)
+            .Select(_ => grain.GetCallHistoryDepthAsync()));
+    }
+
+    public Task StartOneWayHistoryProbeAsync()
+    {
+        _ = GrainFactory.GetGrain<IGrainB>(this.GetPrimaryKeyString())
+            .RecordOneWayHistoryDepthAsync();
+        return Task.CompletedTask;
+    }
+
     public Task StartTimerOriginatedCallAsync()
     {
         _timerOriginatedCall?.Dispose();
