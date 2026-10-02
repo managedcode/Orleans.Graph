@@ -44,6 +44,9 @@ jobs:
     - name: Build
       run: dotnet build Orleans.Graph.slnx --configuration Release --no-restore
 
+    - name: Verify formatting
+      run: dotnet format Orleans.Graph.slnx --verify-no-changes --no-restore
+
     - name: Test
       run: dotnet test --solution Orleans.Graph.slnx --configuration Release --no-build --verbosity normal
 
@@ -84,7 +87,6 @@ jobs:
 
     - name: Publish to NuGet
       id: publish
-      continue-on-error: true
       run: |
         set +e
         OUTPUT=""
