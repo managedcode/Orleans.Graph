@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Orleans.CodeGeneration;
 
 namespace ManagedCode.Orleans.Graph.Models;
 
@@ -23,6 +24,9 @@ public class Call(GrainId? sourceId, GrainId? targetId, Direction direction, str
 
     [Id(4)]
     public GrainId? TargetId { get; set; } = targetId;
+
+    [Id(5)]
+    public InvokeMethodOptions InvocationOptions { get; set; }
 
     public override string ToString() => $"Direction: {Direction,-3} | Interface: {Interface,-20} | Method: {Method}";
 }

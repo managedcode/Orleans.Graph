@@ -15,7 +15,9 @@ The library lets a silo declare the grain calls it permits, blocks missing trans
 - Fluent builder API for source grain, target grain, method, client-call, and reentrancy rules.
 - Attribute-based graph configuration for colocating policies with grain contracts.
 - Incoming and outgoing Orleans call filters for runtime enforcement.
-- Deadlock detection for active grain call chains, with opt-in self-reentrancy.
+- Deadlock detection for active grain call chains, with opt-in self-reentrancy and Orleans invocation metadata.
+  `AlwaysInterleave` calls can return to an occupied grain. A `ReadOnly` return is allowed only when every
+  outstanding invocation on that grain is read-only or always interleaving; a write or missing metadata still blocks it.
 - Mermaid policy and live-call diagrams.
 - Policy edge snapshots through `GetPolicyEdges()` for diagnostics and custom visualizers.
 - .NET 10, Orleans 10, central package management, TUnit tests, and CI coverage reporting.

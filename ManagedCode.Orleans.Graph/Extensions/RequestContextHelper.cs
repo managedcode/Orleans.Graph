@@ -1,5 +1,6 @@
 using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
+using Orleans.CodeGeneration;
 
 namespace ManagedCode.Orleans.Graph.Extensions;
 
@@ -10,7 +11,10 @@ public static class RequestContextHelper
         EnsureValidGrainIdentity(context.InterfaceName, context.MethodName);
 
         var call = GetOrCreateCallHistory(out var created);
-        call.Push(new InCall(context.SourceId, context.TargetId, context.InterfaceName, context.MethodName));
+        call.Push(new InCall(context.SourceId, context.TargetId, context.InterfaceName, context.MethodName)
+        {
+            InvocationOptions = GetInvocationOptions(context)
+        });
         if (created)
         {
             context.SetCallHistory(call);
@@ -33,7 +37,10 @@ public static class RequestContextHelper
             callerContext.Caller,
             context.InterfaceName,
             context.MethodName,
-            callerContext.Method));
+            callerContext.Method)
+        {
+            InvocationOptions = GetInvocationOptions(context)
+        });
         if (created)
         {
             context.SetCallHistory(call);
@@ -51,6 +58,9 @@ public static class RequestContextHelper
 
         return context.TrackIncomingCall();
     }
+
+    private static InvokeMethodOptions GetInvocationOptions(IGrainCallContext context) =>
+        context.Request is IRequest request ? request.Options : InvokeMethodOptions.None;
 
     public static bool TrackOutgoingCall(this IOutgoingGrainCallContext context, GraphCallFilterConfig graphCallFilterConfig)
     {

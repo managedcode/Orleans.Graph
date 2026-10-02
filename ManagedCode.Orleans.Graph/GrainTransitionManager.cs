@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
+using Orleans.CodeGeneration;
 
 namespace ManagedCode.Orleans.Graph;
 
@@ -153,7 +154,7 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
 
         var graph = new Dictionary<GrainId, List<GrainId>>(callHistory.History.Count);
 
-        foreach (var historyEntry in callHistory.History)
+        foreach (var historyEntry in callHistory.History.Reverse())
         {
             if (historyEntry is not OutCall call)
             {
@@ -170,6 +171,12 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
                 continue;
             }
 
+            if (!CanInterleaveCall(call, callHistory) &&
+                CanReach(call.TargetId.Value, call.SourceId.Value, graph, new HashSet<GrainId>(graph.Count)))
+            {
+                return ReportDeadlock(call.SourceId.Value, throwOnViolation);
+            }
+
             ref var neighbors = ref CollectionsMarshal.GetValueRefOrAddDefault(graph, call.SourceId.Value, out var exists);
             if (!exists || neighbors is null)
             {
@@ -177,27 +184,6 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
             }
 
             neighbors.Add(call.TargetId.Value);
-        }
-
-        if (graph.Count == 0)
-        {
-            return false;
-        }
-
-        var visited = new HashSet<GrainId>(graph.Count);
-        var stack = new HashSet<GrainId>(graph.Count);
-
-        foreach (var node in graph.Keys)
-        {
-            if (IsCyclic(node, graph, visited, stack))
-            {
-                if (throwOnViolation)
-                {
-                    ThrowDeadlock(node);
-                }
-
-                return true;
-            }
         }
 
         return false;
@@ -217,7 +203,7 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
             return false;
         }
 
-        if (IsReentrantSelfCall(latestCall))
+        if (IsReentrantSelfCall(latestCall) || CanInterleaveCall(latestCall, callHistory))
         {
             return false;
         }
@@ -271,6 +257,44 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
         return !string.IsNullOrWhiteSpace(call.Caller) &&
                string.Equals(call.Caller, call.Interface, StringComparison.Ordinal) &&
                _grainGraph.HasReentrantTransition(call.Caller, call.Interface);
+    }
+
+    private static bool CanInterleaveCall(OutCall call, CallHistory history)
+    {
+        if ((call.InvocationOptions & InvokeMethodOptions.AlwaysInterleave) != 0)
+        {
+            return true;
+        }
+
+        if ((call.InvocationOptions & InvokeMethodOptions.ReadOnly) == 0)
+        {
+            return false;
+        }
+
+        var foundCall = false;
+        var hasOutstandingTarget = false;
+        foreach (var earlierCall in history.History)
+        {
+            if (!foundCall)
+            {
+                foundCall = ReferenceEquals(earlierCall, call);
+                continue;
+            }
+
+            if (earlierCall.TargetId != call.TargetId)
+            {
+                continue;
+            }
+
+            hasOutstandingTarget = true;
+            if ((earlierCall.InvocationOptions & (InvokeMethodOptions.ReadOnly |
+                                                 InvokeMethodOptions.AlwaysInterleave)) == 0)
+            {
+                return false;
+            }
+        }
+
+        return hasOutstandingTarget;
     }
 
     private static bool ReportDeadlock(GrainId grainId, bool throwOnViolation)
@@ -781,36 +805,6 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
         return lastDot >= 0 && lastDot < fullName.Length - 1
             ? fullName[(lastDot + 1)..]
             : fullName;
-    }
-
-    private static bool IsCyclic(GrainId node, Dictionary<GrainId, List<GrainId>> graph, HashSet<GrainId> visited, HashSet<GrainId> stack)
-    {
-        if (stack.Contains(node))
-        {
-            return true;
-        }
-
-        if (visited.Contains(node))
-        {
-            return false;
-        }
-
-        visited.Add(node);
-        stack.Add(node);
-
-        if (graph.TryGetValue(node, out var value))
-        {
-            foreach (var neighbor in value)
-            {
-                if (IsCyclic(neighbor, graph, visited, stack))
-                {
-                    return true;
-                }
-            }
-        }
-
-        stack.Remove(node);
-        return false;
     }
 
     private static bool CanReach(GrainId current, GrainId target, Dictionary<GrainId, List<GrainId>> graph, HashSet<GrainId> visited)
