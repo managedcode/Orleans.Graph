@@ -7,14 +7,14 @@ namespace ManagedCode.Orleans.Graph.Extensions;
 
 internal static class MayInterleavePredicateCache
 {
-    private static readonly ConcurrentDictionary<Type, Lazy<Func<object, IInvokable, bool>>> Predicates = new();
+    private static readonly ConcurrentDictionary<Type, Lazy<Func<object, IInvokable, bool>>> _predicates = new();
 
     public static bool Allows(object grain, IInvokable request)
     {
         ArgumentNullException.ThrowIfNull(grain);
         ArgumentNullException.ThrowIfNull(request);
 
-        return Predicates.GetOrAdd(
+        return _predicates.GetOrAdd(
                 grain.GetType(),
                 static grainType => new Lazy<Func<object, IInvokable, bool>>(
                     () => CreatePredicate(grainType),
