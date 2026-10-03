@@ -28,6 +28,9 @@ public class Call(GrainId? sourceId, GrainId? targetId, Direction direction, str
     [Id(5)]
     public InvokeMethodOptions InvocationOptions { get; set; }
 
+    [Id(6)]
+    public bool MayInterleave { get; set; }
+
     public override string ToString() => $"Direction: {Direction,-3} | Interface: {Interface,-20} | Method: {Method}";
 }
 #pragma warning restore CA1716

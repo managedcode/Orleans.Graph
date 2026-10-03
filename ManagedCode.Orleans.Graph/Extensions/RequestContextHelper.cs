@@ -13,7 +13,8 @@ public static class RequestContextHelper
         var call = GetOrCreateCallHistory(out var created);
         call.Push(new InCall(context.SourceId, context.TargetId, context.InterfaceName, context.MethodName)
         {
-            InvocationOptions = GetInvocationOptions(context)
+            InvocationOptions = GetInvocationOptions(context),
+            MayInterleave = MayInterleavePredicateCache.Allows(context.Grain, context.Request)
         });
         if (created)
         {

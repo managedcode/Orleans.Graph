@@ -266,13 +266,11 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
             return true;
         }
 
-        if ((call.InvocationOptions & InvokeMethodOptions.ReadOnly) == 0)
-        {
-            return false;
-        }
-
+        var isReadOnly = (call.InvocationOptions & InvokeMethodOptions.ReadOnly) != 0;
         var foundCall = false;
         var hasOutstandingTarget = false;
+        var foundBlockingRequest = false;
+        var canInterleaveReadOnly = true;
         foreach (var earlierCall in history.History)
         {
             if (!foundCall)
@@ -286,15 +284,29 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
                 continue;
             }
 
+            if (earlierCall is InCall incomingCall && !foundBlockingRequest)
+            {
+                foundBlockingRequest = true;
+                if (incomingCall.MayInterleave)
+                {
+                    return true;
+                }
+            }
+
+            if (!isReadOnly)
+            {
+                continue;
+            }
+
             hasOutstandingTarget = true;
             if ((earlierCall.InvocationOptions & (InvokeMethodOptions.ReadOnly |
                                                  InvokeMethodOptions.AlwaysInterleave)) == 0)
             {
-                return false;
+                canInterleaveReadOnly = false;
             }
         }
 
-        return hasOutstandingTarget;
+        return isReadOnly && hasOutstandingTarget && canInterleaveReadOnly;
     }
 
     private static bool ReportDeadlock(GrainId grainId, bool throwOnViolation)

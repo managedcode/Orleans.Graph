@@ -605,6 +605,39 @@ public class GrainTransitionManagerTests
     }
 
     [Test]
+    public void DetectLatestDeadlock_AllowsCallbackWhenBlockingIncomingMayInterleavePredicateAcceptedIt()
+    {
+        var graph = GrainCallsBuilder.Create()
+            .AllowAll()
+            .Build();
+
+        var grainAId = GrainId.Create("graina", "may-interleave");
+        var grainBId = GrainId.Create("grainb", "may-interleave");
+        var callHistory = new CallHistory();
+        callHistory.Push(new InCall(null, grainAId, typeof(IGrainA).FullName!, nameof(IGrainA.MethodA1))
+        {
+            MayInterleave = true
+        });
+        callHistory.Push(new OutCall(
+            grainAId,
+            grainBId,
+            typeof(IGrainA).FullName!,
+            typeof(IGrainB).FullName!,
+            nameof(IGrainB.MethodB1),
+            nameof(IGrainA.MethodA1)));
+        callHistory.Push(new InCall(grainAId, grainBId, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1)));
+        callHistory.Push(new OutCall(
+            grainBId,
+            grainAId,
+            typeof(IGrainB).FullName!,
+            typeof(IGrainA).FullName!,
+            nameof(IGrainA.MethodA1),
+            nameof(IGrainB.MethodB1)));
+
+        graph.DetectLatestDeadlock(callHistory).ShouldBeFalse();
+    }
+
+    [Test]
     public void GeneratePolicyMermaidDiagram_ProducesEdges()
     {
         var graph = GrainCallsBuilder.Create()
