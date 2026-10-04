@@ -1,6 +1,8 @@
+using ManagedCode.Orleans.Graph.Features.AsyncEnumeration;
 using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
 using Orleans.CodeGeneration;
+using Orleans.Serialization.Invocation;
 
 namespace ManagedCode.Orleans.Graph.Extensions;
 
@@ -8,39 +10,76 @@ public static class RequestContextHelper
 {
     public static bool TrackIncomingCall(this IIncomingGrainCallContext context)
     {
-        EnsureValidGrainIdentity(context.InterfaceName, context.MethodName);
+        var request = AsyncEnumerationRequestAdapter.GetPolicyRequest(context.Request);
+        return TrackIncomingCall(context, request);
+    }
+
+    private static bool TrackIncomingCall(IIncomingGrainCallContext context, IInvokable request)
+    {
+        var interfaceName = request.GetInterfaceName();
+        var methodName = request.GetMethodName();
+        EnsureValidGrainIdentity(interfaceName, methodName);
 
         var call = GetOrCreateCallHistory(out var created);
-        call.Push(new InCall(context.SourceId, context.TargetId, context.InterfaceName, context.MethodName)
+        call.Push(new InCall(context.SourceId, context.TargetId, interfaceName, methodName)
         {
-            InvocationOptions = GetInvocationOptions(context),
-            MayInterleave = MayInterleavePredicateCache.Allows(context.Grain, context.Request)
+            InvocationOptions = GetInvocationOptions(request),
+            MayInterleave = MayInterleavePredicateCache.Allows(context.TargetContext.GrainInstance!, request)
         });
         if (created)
         {
             context.SetCallHistory(call);
         }
 
-        SetCurrentCaller(context.InterfaceName, context.MethodName);
+        SetCurrentCaller(interfaceName, methodName);
         return true;
     }
 
     public static bool TrackOutgoingCall(this IOutgoingGrainCallContext context)
     {
-        EnsureValidGrainIdentity(context.InterfaceName, context.MethodName);
+        return TrackOutgoingCall(context, AsyncEnumerationRequestAdapter.GetPolicyRequest(context.Request));
+    }
+
+    public static bool TrackIncomingCall(this IIncomingGrainCallContext context, GraphCallFilterConfig graphCallFilterConfig)
+    {
+        var hasOriginalStream = AsyncEnumerationRequestAdapter.TryGetOriginal(context.Request, out var originalRequest);
+        var request = hasOriginalStream ? originalRequest : context.Request;
+        var moduleName = hasOriginalStream ? request.GetMethod().Module.Name : context.ImplementationMethod.Module.Name;
+        if (context.ShouldSkipTracking(graphCallFilterConfig, moduleName))
+        {
+            return false;
+        }
+
+        return TrackIncomingCall(context, request);
+    }
+
+    private static InvokeMethodOptions GetInvocationOptions(IInvokable request) =>
+        request is IRequest grainRequest ? grainRequest.Options : InvokeMethodOptions.None;
+
+    public static bool TrackOutgoingCall(this IOutgoingGrainCallContext context, GraphCallFilterConfig graphCallFilterConfig)
+    {
+        var hasOriginalStream = AsyncEnumerationRequestAdapter.TryGetOriginal(context.Request, out var originalRequest);
+        var request = hasOriginalStream ? originalRequest : context.Request;
+        var moduleName = hasOriginalStream ? request.GetMethod().Module.Name : context.InterfaceMethod.Module.Name;
+        if (context.ShouldSkipTracking(graphCallFilterConfig, moduleName))
+        {
+            return false;
+        }
+
+        return TrackOutgoingCall(context, request);
+    }
+
+    private static bool TrackOutgoingCall(IOutgoingGrainCallContext context, IInvokable request)
+    {
+        var interfaceName = request.GetInterfaceName();
+        var methodName = request.GetMethodName();
+        EnsureValidGrainIdentity(interfaceName, methodName);
 
         var callerContext = ResolveCaller(context);
-
         var call = GetOrCreateCallHistory(out var created);
-        call.Push(new OutCall(
-            context.SourceId,
-            context.TargetId,
-            callerContext.Caller,
-            context.InterfaceName,
-            context.MethodName,
-            callerContext.Method)
+        call.Push(new OutCall(context.SourceId, context.TargetId, callerContext.Caller, interfaceName, methodName, callerContext.Method)
         {
-            InvocationOptions = GetInvocationOptions(context)
+            InvocationOptions = GetInvocationOptions(request)
         });
         if (created)
         {
@@ -48,29 +87,6 @@ public static class RequestContextHelper
         }
 
         return true;
-    }
-
-    public static bool TrackIncomingCall(this IIncomingGrainCallContext context, GraphCallFilterConfig graphCallFilterConfig)
-    {
-        if (context.ShouldSkipTracking(graphCallFilterConfig, context.ImplementationMethod.Module.Name))
-        {
-            return false;
-        }
-
-        return context.TrackIncomingCall();
-    }
-
-    private static InvokeMethodOptions GetInvocationOptions(IGrainCallContext context) =>
-        context.Request is IRequest request ? request.Options : InvokeMethodOptions.None;
-
-    public static bool TrackOutgoingCall(this IOutgoingGrainCallContext context, GraphCallFilterConfig graphCallFilterConfig)
-    {
-        if (context.ShouldSkipTracking(graphCallFilterConfig, context.InterfaceMethod.Module.Name))
-        {
-            return false;
-        }
-
-        return context.TrackOutgoingCall();
     }
 
     public static CallHistory GetCallHistory(this IGrainCallContext context)
@@ -108,8 +124,9 @@ public static class RequestContextHelper
 
     public static bool IsOrleansGraphTelemetryCall(this IGrainCallContext context)
     {
-        return string.Equals(context.InterfaceName, typeof(IOrleansGraphTelemetryWorker).FullName, StringComparison.Ordinal) ||
-               string.Equals(context.InterfaceName, typeof(IOrleansGraphTelemetryGrain).FullName, StringComparison.Ordinal);
+        var request = AsyncEnumerationRequestAdapter.GetPolicyRequest(context.Request);
+        return string.Equals(request.GetInterfaceName(), typeof(IOrleansGraphTelemetryWorker).FullName, StringComparison.Ordinal) ||
+               string.Equals(request.GetInterfaceName(), typeof(IOrleansGraphTelemetryGrain).FullName, StringComparison.Ordinal);
     }
 
     public static bool IsTelemetrySuppressed()

@@ -1,9 +1,11 @@
 using ManagedCode.Orleans.Graph.Extensions;
+using ManagedCode.Orleans.Graph.Features.AsyncEnumeration;
 using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
 using ManagedCode.Orleans.Graph.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Concurrency;
+using Orleans.Serialization.Invocation;
 
 namespace ManagedCode.Orleans.Graph.Filters;
 
@@ -11,10 +13,12 @@ public class GraphIncomingGrainCallFilter(IServiceProvider serviceProvider, Grap
 {
     private readonly GrainTransitionManager? _graphManager = serviceProvider.GetService<GrainTransitionManager>();
     private readonly IGrainFactory? _grainFactory = serviceProvider.GetService<IGrainFactory>();
+    private readonly AsyncEnumerationFactoryCatalog? _enumerationCatalog = serviceProvider.GetService<AsyncEnumerationFactoryCatalog>();
 
     public async Task Invoke(IIncomingGrainCallContext context)
     {
         var currentCaller = RequestContextHelper.CaptureCurrentCaller();
+        var isEnumerationStart = AsyncEnumerationRequestAdapter.TryGetOriginal(context.Request, out var originalRequest);
         var tracked = context.TrackIncomingCall(graphCallFilterConfig);
         var previousHistory = RequestContext.Get(Constants.RequestContextKey);
         var detachOneWay = context.InterfaceMethod.IsDefined(typeof(OneWayAttribute), inherit: true) &&
@@ -32,6 +36,11 @@ public class GraphIncomingGrainCallFilter(IServiceProvider serviceProvider, Grap
                 }
 
                 await ReportObservedEdgeAsync(context, callHistory);
+            }
+
+            if (isEnumerationStart && tracked)
+            {
+                WrapEnumerationRequest(context, originalRequest);
             }
 
             if (detachOneWay)
@@ -53,6 +62,17 @@ public class GraphIncomingGrainCallFilter(IServiceProvider serviceProvider, Grap
                 RequestContextHelper.RestoreCurrentCaller(currentCaller);
             }
         }
+    }
+
+    private void WrapEnumerationRequest(IIncomingGrainCallContext context, IInvokable originalRequest)
+    {
+        if (_enumerationCatalog is null)
+        {
+            throw new InvalidOperationException("Asynchronous enumeration Graph catalog is not registered.");
+        }
+
+        var scope = AsyncEnumerationScope.Capture();
+        context.Request.SetArgument(1, _enumerationCatalog.Wrap(originalRequest, scope));
     }
 
     private async Task ReportObservedEdgeAsync(IIncomingGrainCallContext context, CallHistory callHistory)

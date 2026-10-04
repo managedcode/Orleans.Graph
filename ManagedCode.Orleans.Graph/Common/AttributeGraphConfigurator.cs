@@ -6,7 +6,10 @@ namespace ManagedCode.Orleans.Graph;
 
 internal static class AttributeGraphConfigurator
 {
-    public static void ApplyFromAssemblies(GrainCallsBuilder builder, IEnumerable<Assembly>? assemblies)
+    public static void ApplyFromAssemblies(
+        GrainCallsBuilder builder,
+        IEnumerable<Assembly>? assemblies,
+        Action<Type>? onGrainInterface = null)
     {
         var assemblyList = (assemblies?.Any() == true)
             ? assemblies!
@@ -18,6 +21,8 @@ internal static class AttributeGraphConfigurator
             {
                 continue;
             }
+
+            onGrainInterface?.Invoke(type);
 
             var sourceName = TypeExtensions.GetTypeName(type);
 

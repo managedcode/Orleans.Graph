@@ -178,6 +178,8 @@ Mermaid arrows:
 - `-.->` reentrant transition
 - `==>` active live-call edge
 
+Native Orleans `IAsyncEnumerable<T>` calls retain the original grain caller and method across first and later pulls. The implementation and registration contract are documented in [AsyncEnumeration](ManagedCode.Orleans.Graph/Features/AsyncEnumeration/README.md).
+
 ## Development
 
 ```sh

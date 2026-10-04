@@ -1,4 +1,5 @@
 using System.Reflection;
+using ManagedCode.Orleans.Graph.Features.AsyncEnumeration;
 using ManagedCode.Orleans.Graph.Filters;
 using ManagedCode.Orleans.Graph.Models;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,18 +26,22 @@ public static class OrleansGraphExtensions
         builder.AddIncomingGrainCallFilter<GraphIncomingGrainCallFilter>();
         builder.AddOutgoingGrainCallFilter<GraphOutgoingGrainCallFilter>();
 
-        var manager = BuildManager(configureGraph, assemblies);
+        var (manager, enumerationCatalog) = BuildManager(configureGraph, assemblies);
         builder.Services.AddSingleton(manager);
+        builder.Services.AddSingleton(enumerationCatalog);
         return builder;
     }
 
-    private static GrainTransitionManager BuildManager(Action<IGrainCallsBuilder>? configureGraph, Assembly[]? assemblies)
+    private static (GrainTransitionManager Manager, AsyncEnumerationFactoryCatalog EnumerationCatalog) BuildManager(
+        Action<IGrainCallsBuilder>? configureGraph,
+        Assembly[]? assemblies)
     {
         var grainGraph = new GrainCallsBuilder();
+        var catalogBuilder = new AsyncEnumerationFactoryCatalogBuilder();
         var assemblySet = assemblies is { Length: > 0 } ? assemblies : null;
-        AttributeGraphConfigurator.ApplyFromAssemblies(grainGraph, assemblySet);
+        AttributeGraphConfigurator.ApplyFromAssemblies(grainGraph, assemblySet, catalogBuilder.AddGrainInterface);
         configureGraph?.Invoke(grainGraph);
-        return grainGraph.Build();
+        return (grainGraph.Build(), catalogBuilder.Build());
     }
 
     [Obsolete("AddOrleansGraph(configureGraph: ...) automatically registers the graph.")]
@@ -53,8 +58,9 @@ public static class OrleansGraphExtensions
     [Obsolete("AddOrleansGraph automatically scans assemblies for attributes.")]
     public static ISiloBuilder CreateGraphFromAttributes(this ISiloBuilder builder, params Assembly[] assemblies)
     {
-        var manager = BuildManager(null, assemblies);
+        var (manager, enumerationCatalog) = BuildManager(null, assemblies);
         builder.Services.AddSingleton(manager);
+        builder.Services.AddSingleton(enumerationCatalog);
         return builder;
     }
 }
