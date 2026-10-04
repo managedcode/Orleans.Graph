@@ -37,6 +37,26 @@ public class GrainCallsBuilder(bool allowSelfLoops = true) : IGrainCallsBuilder
         return From<TFrom>().To<TTo>();
     }
 
+    public IGrainCallsBuilder AddGrainServiceTransition<TService, TGrain>(params string[] targetMethods)
+        where TService : GrainService
+        where TGrain : IGrain
+    {
+        ArgumentNullException.ThrowIfNull(targetMethods);
+        if (targetMethods.Length == 0 || targetMethods.Any(string.IsNullOrWhiteSpace))
+        {
+            throw new ArgumentException("At least one nonblank target method name is required.", nameof(targetMethods));
+        }
+
+        var serviceName = typeof(TService).GetTypeName();
+        var targetName = typeof(TGrain).GetTypeName();
+        foreach (var targetMethod in targetMethods)
+        {
+            AddMethodRule(serviceName, targetName, Constants.AnyMethod, targetMethod);
+        }
+
+        return this;
+    }
+
     public IGrainCallsBuilder And()
     {
         return this;

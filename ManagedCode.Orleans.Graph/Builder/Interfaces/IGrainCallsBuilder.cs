@@ -48,6 +48,17 @@ public interface IGrainCallsBuilder
     IMethodBuilder<TFrom, TTo> AddGrainTransition<TFrom, TTo>() where TFrom : IGrain where TTo : IGrain;
 
     /// <summary>
+    /// Allows a native Orleans grain service to call only the specified methods on an application grain.
+    /// </summary>
+    /// <typeparam name="TService">The concrete Orleans grain service implementation.</typeparam>
+    /// <typeparam name="TGrain">The application grain interface being called.</typeparam>
+    /// <param name="targetMethods">The exact application-grain method names which the service callback may call.</param>
+    /// <returns>The current instance of <see cref="IGrainCallsBuilder"/>.</returns>
+    IGrainCallsBuilder AddGrainServiceTransition<TService, TGrain>(params string[] targetMethods)
+        where TService : GrainService
+        where TGrain : IGrain;
+
+    /// <summary>
     /// Adds a logical AND to the builder.
     /// </summary>
     /// <returns>The current instance of <see cref="IGrainCallsBuilder"/>.</returns>
