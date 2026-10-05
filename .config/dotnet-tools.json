@@ -3,21 +3,21 @@
   "isRoot": true,
   "tools": {
     "coverlet.console": {
-      "version": "10.0.0",
+      "version": "10.1.0",
       "commands": [
         "coverlet"
       ],
       "rollForward": false
     },
     "dotnet-reportgenerator-globaltool": {
-      "version": "5.5.10",
+      "version": "5.5.11",
       "commands": [
         "reportgenerator"
       ],
       "rollForward": false
     },
     "roslynator.dotnet.cli": {
-      "version": "0.12.0",
+      "version": "1.0.1",
       "commands": [
         "roslynator"
       ],
