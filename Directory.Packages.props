@@ -3,8 +3,8 @@
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
   <ItemGroup>
-    <PackageVersion Include="coverlet.collector" Version="10.0.1" />
-    <PackageVersion Include="coverlet.msbuild" Version="10.0.1" />
+    <PackageVersion Include="coverlet.collector" Version="10.1.0" />
+    <PackageVersion Include="coverlet.msbuild" Version="10.1.0" />
     <PackageVersion Include="DotNet.ReproducibleBuilds" Version="2.0.5" />
     <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="5.9.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.Workspaces.Common" Version="5.9.0" />
@@ -22,6 +22,6 @@
     <PackageVersion Include="Microsoft.Orleans.TestingHost" Version="10.4.0" />
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.401" />
     <PackageVersion Include="Shouldly" Version="4.3.0" />
-    <PackageVersion Include="TUnit" Version="1.69.0" />
+    <PackageVersion Include="TUnit" Version="1.72.16" />
   </ItemGroup>
 </Project>
