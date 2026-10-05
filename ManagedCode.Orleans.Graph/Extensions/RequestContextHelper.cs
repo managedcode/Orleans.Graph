@@ -193,7 +193,9 @@ public static class RequestContextHelper
     private static bool ShouldSkipTracking(this IGrainCallContext context, GraphCallFilterConfig graphCallFilterConfig, string moduleName)
     {
         if (!graphCallFilterConfig.TrackOrleansCalls &&
-            (context.TargetId.IsSystemTarget() || moduleName.StartsWith("Orleans.", StringComparison.Ordinal)))
+            (context.TargetId.IsSystemTarget() ||
+             (moduleName.StartsWith("Orleans.", StringComparison.Ordinal) &&
+              !IsActivationCallbackCaller(context.Request.GetInterfaceName()))))
         {
             return true;
         }
