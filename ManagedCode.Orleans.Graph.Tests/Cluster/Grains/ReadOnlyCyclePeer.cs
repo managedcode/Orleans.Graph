@@ -13,5 +13,13 @@ public class ReadOnlyCyclePeer : Grain, IReadOnlyCyclePeer
     public Task<int> ReadInterleavingRootAsync() =>
         GrainFactory.GetGrain<IReadOnlyCycleRoot>(this.GetPrimaryKeyString()).ReadInterleavingPeerAsync();
 
+    public Task<int> WriteRootAsync() =>
+        GrainFactory.GetGrain<IReadOnlyCycleRoot>(this.GetPrimaryKeyString()).WriteValueAsync();
+
+    public Task<int> WriteInterleavingRootAsync() => WriteRootAsync();
+
+    public Task<int> WriteThroughRootAsync() =>
+        GrainFactory.GetGrain<IReadOnlyCycleRoot>(this.GetPrimaryKeyString()).WriteThroughPeerNormallyAsync();
+
     public Task<int> ReadValueAsync() => Task.FromResult(ReadOnlyCycleRoot.Value);
 }

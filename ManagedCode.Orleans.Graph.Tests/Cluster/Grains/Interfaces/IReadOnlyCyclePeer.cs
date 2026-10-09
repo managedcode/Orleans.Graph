@@ -9,6 +9,13 @@ public interface IReadOnlyCyclePeer : IGrainWithStringKey
 
     Task<int> ReadInterleavingRootAsync();
 
+    Task<int> WriteRootAsync();
+
+    [AlwaysInterleave]
+    Task<int> WriteInterleavingRootAsync();
+
+    Task<int> WriteThroughRootAsync();
+
     [ReadOnly]
     Task<int> ReadValueAsync();
 }

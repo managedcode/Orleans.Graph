@@ -270,6 +270,7 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
         var foundCall = false;
         var hasOutstandingTarget = false;
         var foundBlockingRequest = false;
+        var hasIncomingTarget = false;
         var canInterleaveReadOnly = true;
         foreach (var earlierCall in history.History)
         {
@@ -284,12 +285,24 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
                 continue;
             }
 
-            if (earlierCall is InCall incomingCall && !foundBlockingRequest)
+            if (earlierCall is InCall incomingCall)
             {
-                foundBlockingRequest = true;
-                if (incomingCall.MayInterleave)
+                hasIncomingTarget = true;
+                // Orleans never makes an AlwaysInterleave request the blocking
+                // request. A normal callback can therefore enter while only
+                // interleaving requests remain outstanding on this target.
+                if ((incomingCall.InvocationOptions & InvokeMethodOptions.AlwaysInterleave) != 0)
                 {
-                    return true;
+                    continue;
+                }
+
+                if (!foundBlockingRequest)
+                {
+                    foundBlockingRequest = true;
+                    if (incomingCall.MayInterleave)
+                    {
+                        return true;
+                    }
                 }
             }
 
@@ -306,7 +319,8 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
             }
         }
 
-        return isReadOnly && hasOutstandingTarget && canInterleaveReadOnly;
+        return hasIncomingTarget && !foundBlockingRequest ||
+               isReadOnly && hasOutstandingTarget && canInterleaveReadOnly;
     }
 
     private static bool ReportDeadlock(GrainId grainId, bool throwOnViolation)

@@ -11,6 +11,21 @@ public interface IReadOnlyCycleRoot : IGrainWithStringKey
 
     Task<int> WriteThroughPeerAgainAsync();
 
+    [AlwaysInterleave]
+    Task<int> WriteThroughSelfAsync();
+
+    [AlwaysInterleave]
+    Task<int> InterleavingWriteThroughPeerAsync();
+
+    Task<int> WriteThroughPeerNormallyAsync();
+
+    Task<int> WriteThroughInterleavingPeerAsync();
+
+    [AlwaysInterleave]
+    Task<int> InterleavingWriteThroughPeerAgainAsync();
+
+    Task<int> WriteValueAsync();
+
     [ReadOnly]
     Task<int> ReadValueAsync();
 

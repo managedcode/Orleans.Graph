@@ -15,6 +15,23 @@ public class ReadOnlyCycleRoot : Grain, IReadOnlyCycleRoot
     public Task<int> WriteThroughPeerAgainAsync() =>
         GrainFactory.GetGrain<IReadOnlyCyclePeer>(this.GetPrimaryKeyString()).ReadInterleavingRootAsync();
 
+    public Task<int> WriteThroughSelfAsync() =>
+        GrainFactory.GetGrain<IReadOnlyCycleRoot>(this.GetPrimaryKeyString()).WriteValueAsync();
+
+    public Task<int> InterleavingWriteThroughPeerAsync() =>
+        GrainFactory.GetGrain<IReadOnlyCyclePeer>(this.GetPrimaryKeyString()).WriteRootAsync();
+
+    public Task<int> WriteThroughPeerNormallyAsync() =>
+        GrainFactory.GetGrain<IReadOnlyCyclePeer>(this.GetPrimaryKeyString()).WriteRootAsync();
+
+    public Task<int> WriteThroughInterleavingPeerAsync() =>
+        GrainFactory.GetGrain<IReadOnlyCyclePeer>(this.GetPrimaryKeyString()).WriteInterleavingRootAsync();
+
+    public Task<int> InterleavingWriteThroughPeerAgainAsync() =>
+        GrainFactory.GetGrain<IReadOnlyCyclePeer>(this.GetPrimaryKeyString()).WriteThroughRootAsync();
+
+    public Task<int> WriteValueAsync() => Task.FromResult(Value);
+
     public Task<int> ReadValueAsync() => Task.FromResult(Value);
 
     public Task<int> ReadInterleavingValueAsync() => Task.FromResult(Value);
