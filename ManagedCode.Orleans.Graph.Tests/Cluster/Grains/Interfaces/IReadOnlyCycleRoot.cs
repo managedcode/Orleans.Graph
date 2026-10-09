@@ -19,6 +19,32 @@ public interface IReadOnlyCycleRoot : IGrainWithStringKey
 
     Task<int> WriteThroughPeerNormallyAsync();
 
+    Task<int> WriteThroughPeerWithCallChainReentrancyAsync();
+
+    Task<int> WriteThroughPeerWithInheritedScopeAsync();
+
+    Task<int> WriteThroughScopedPeerAgainAsync();
+
+    Task<int> WriteThroughPeerWithSuppressedScopeAsync();
+
+    Task<int> WriteThroughPeerWithNewScopeAsync();
+
+    Task<int> WriteAfterScopeAsync();
+
+    Task<int> WriteAfterFailedScopeAsync();
+
+    Task<int> WriteThroughNestedSelfScopesAsync();
+
+    Task<int> WriteThroughParallelScopedPeersAsync();
+
+    Task<int> WriteThroughSerializedScopeAsync();
+
+    Task<int> WriteThroughDifferentScopedRootAsync();
+
+    Task WriteWithoutResultInScopeAsync();
+
+    Task<int> WriteWithDetachedScopeAsync();
+
     Task<int> WriteThroughInterleavingPeerAsync();
 
     [AlwaysInterleave]

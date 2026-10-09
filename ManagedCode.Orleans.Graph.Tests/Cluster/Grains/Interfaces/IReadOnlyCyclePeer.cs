@@ -16,6 +16,16 @@ public interface IReadOnlyCyclePeer : IGrainWithStringKey
 
     Task<int> WriteThroughRootAsync();
 
+    Task<int> WriteThroughRootWithOwnScopeAsync();
+
+    Task<int> WriteRootWithSuppressedScopeAsync();
+
+    Task<int> WriteRootWithNewScopeAsync();
+
+    Task<int> WriteNamedRootAsync(string rootKey);
+
+    Task<int> WriteDifferentRootAsync();
+
     [ReadOnly]
     Task<int> ReadValueAsync();
 }

@@ -75,4 +75,11 @@ public class ReadOnlyCallCycleTests(TestRuntimeGraphClusterApplication fixture)
         failure.Message.ShouldStartWith("Deadlock detected.");
     }
 
+    [Test]
+    public async Task ScopedCallChainReentrancyAllowsNormalPeerCallbackAsync()
+    {
+        var root = fixture.Cluster.Client.GetGrain<IReadOnlyCycleRoot>(Guid.NewGuid().ToString("N"));
+        (await root.WriteThroughPeerWithCallChainReentrancyAsync()).ShouldBe(ReadOnlyCycleRoot.Value);
+    }
+
 }

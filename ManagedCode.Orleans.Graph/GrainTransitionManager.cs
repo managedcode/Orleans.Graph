@@ -266,6 +266,13 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
             return true;
         }
 
+        var reentrancyId = RequestContext.ReentrancyId;
+        if (reentrancyId != Guid.Empty && history.NativeCallChainScopes.Any(scope =>
+                scope.ActorId == call.TargetId && scope.ReentrancyId == reentrancyId))
+        {
+            return true;
+        }
+
         var isReadOnly = (call.InvocationOptions & InvokeMethodOptions.ReadOnly) != 0;
         var foundCall = false;
         var hasOutstandingTarget = false;

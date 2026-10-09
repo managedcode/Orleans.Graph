@@ -65,6 +65,22 @@ Register the client-side outgoing filter when Orleans clients should participate
 clientBuilder.AddOrleansGraph();
 ```
 
+## Scoped Call-Chain Reentrancy
+
+Use the library's awaited scope when an operation intentionally permits a callback into its exact actor:
+
+```csharp
+using ManagedCode.Orleans.Graph.Extensions;
+
+public Task<PaymentResult> SubmitAsync(Order order) =>
+    this.WithCallChainReentrancyAsync(() =>
+        GrainFactory.GetGrain<IPaymentGrain>(order.PaymentId).ChargeAsync(order));
+```
+
+`WithCallChainReentrancyAsync` enters Orleans' native call-chain reentrancy section and keeps it open until the supplied operation completes. Graph records only the current actor and native reentrancy Guid. A peer that inherits that Guid does not gain callback permission unless it explicitly enters its own tracked scope. Suppression or a new Guid cannot reuse the parent's permission. The native section and prior history are restored even when the operation fails.
+
+The operation must await its child RPCs. Escaped background work must start a detached history and cannot reuse this scope. The helper does not make a grain globally reentrant, grant transition-policy permission, or repair an unintended ownership cycle. Simplify accidental call chains instead of adding a scope to silence deadlock detection. Calling `RequestContext.AllowCallChainReentrancy()` directly does not register an actor in Graph's history.
+
 ## Observe Mode
 
 Use `AllowAll()` when you want to discover real traffic before enforcing a strict policy. In this mode, unconfigured transitions are allowed, but the filters still send observed calls to stateless telemetry workers. Those workers aggregate calls and periodically flush them into an in-memory telemetry grain used by the live graph.
