@@ -2,9 +2,12 @@
 
 # ManagedCode.Orleans.Graph
 
-[![NuGet](https://badge.fury.io/nu/ManagedCode.Orleans.Graph.svg)](https://www.nuget.org/packages/ManagedCode.Orleans.Graph)
+[![NuGet](https://img.shields.io/nuget/v/ManagedCode.Orleans.Graph.svg?style=flat-square&logo=nuget)](https://www.nuget.org/packages/ManagedCode.Orleans.Graph)
 [![CI](https://github.com/managedcode/Orleans.Graph/actions/workflows/ci.yml/badge.svg)](https://github.com/managedcode/Orleans.Graph/actions/workflows/ci.yml)
 [![CodeQL](https://github.com/managedcode/Orleans.Graph/actions/workflows/codeql-analysis.yml/badge.svg)](https://github.com/managedcode/Orleans.Graph/actions/workflows/codeql-analysis.yml)
+[![Release](https://github.com/managedcode/Orleans.Graph/actions/workflows/release.yml/badge.svg?branch=main)](https://github.com/managedcode/Orleans.Graph/actions/workflows/release.yml)
+[![Downloads](https://img.shields.io/nuget/dt/ManagedCode.Orleans.Graph.svg?style=flat-square&logo=nuget)](https://www.nuget.org/packages/ManagedCode.Orleans.Graph)
+[![License](https://img.shields.io/github/license/managedcode/Orleans.Graph.svg?style=flat-square)](LICENSE)
 
 Grain-to-grain call policy enforcement for Microsoft Orleans applications.
 
@@ -30,6 +33,8 @@ The library lets a silo declare the grain calls it permits, blocks missing trans
 - Microsoft Orleans 10
 
 ## Installation
+
+Install the latest stable release from [NuGet](https://www.nuget.org/packages/ManagedCode.Orleans.Graph):
 
 ```sh
 dotnet add package ManagedCode.Orleans.Graph
