@@ -73,6 +73,17 @@ public interface IAsyncEnumerationSource : IGrainWithStringKey
     Task<StreamCounts> GetCountsAsync();
 }
 
+public interface IInheritedAsyncEnumeration<TItem> : IGrainWithStringKey
+{
+    IAsyncEnumerable<TItem> InheritedAsync(string streamKey);
+
+    IAsyncEnumerable<TItem> DeniedInheritedAsync(string streamKey);
+}
+
+public interface IClosedInheritedAsyncEnumerationSource : IInheritedAsyncEnumeration<StreamItem>
+{
+}
+
 public interface IAsyncEnumerationLeaf : IGrainWithStringKey
 {
     Task<StreamProbe> ObserveAsync(string streamKey);

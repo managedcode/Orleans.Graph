@@ -5,9 +5,14 @@ using ManagedCode.Orleans.Graph.Models;
 
 namespace ManagedCode.Orleans.Graph.Tests.Features.AsyncEnumeration;
 
-public sealed partial class AsyncEnumerationSourceGrain : Grain, IAsyncEnumerationSource, IAsyncEnumerationCatalogProbe
+public sealed partial class AsyncEnumerationSourceGrain : Grain, IAsyncEnumerationSource, IAsyncEnumerationCatalogProbe,
+    IClosedInheritedAsyncEnumerationSource
 {
     public IAsyncEnumerable<StreamItem> AllowedAsync(string streamKey) => EnumerateAsync(streamKey, false);
+
+    public IAsyncEnumerable<StreamItem> InheritedAsync(string streamKey) => EnumerateAsync(streamKey, false);
+
+    public IAsyncEnumerable<StreamItem> DeniedInheritedAsync(string streamKey) => EnumerateAsync(streamKey, false);
 
     public IAsyncEnumerable<StreamItem> DeniedAsync(string streamKey) => EnumerateAsync(streamKey, false);
 

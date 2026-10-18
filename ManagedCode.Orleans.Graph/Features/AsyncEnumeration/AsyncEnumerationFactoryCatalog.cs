@@ -40,22 +40,25 @@ internal sealed class AsyncEnumerationFactoryCatalogBuilder
             return;
         }
 
-        foreach (var method in grainInterface.GetMethods())
+        foreach (var contract in grainInterface.GetInterfaces().Prepend(grainInterface))
         {
-            if (!TryGetItemType(method, out var itemType))
+            foreach (var method in contract.GetMethods())
             {
-                continue;
-            }
+                if (!TryGetItemType(method, out var itemType))
+                {
+                    continue;
+                }
 
-            if (!_factoriesByItemType.TryGetValue(itemType, out var factory))
-            {
-                var createFactory = _createFactoryMethod.MakeGenericMethod(itemType);
-                factory = (Func<IInvokable, AsyncEnumerationScope, IInvokable>)createFactory.CreateDelegate(
-                    typeof(Func<IInvokable, AsyncEnumerationScope, IInvokable>));
-                _factoriesByItemType.Add(itemType, factory);
-            }
+                if (!_factoriesByItemType.TryGetValue(itemType, out var factory))
+                {
+                    var createFactory = _createFactoryMethod.MakeGenericMethod(itemType);
+                    factory = (Func<IInvokable, AsyncEnumerationScope, IInvokable>)createFactory.CreateDelegate(
+                        typeof(Func<IInvokable, AsyncEnumerationScope, IInvokable>));
+                    _factoriesByItemType.Add(itemType, factory);
+                }
 
-            _factories.TryAdd(method, factory);
+                _factories.TryAdd(method, factory);
+            }
         }
     }
 

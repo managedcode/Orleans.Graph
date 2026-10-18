@@ -6,6 +6,11 @@ internal static class SystemTargetTestProtocol
     internal const string ProbeAlias = "Graph.Tests.SystemTargetProbe";
     internal const string ReplyAlias = "Graph.Tests.SystemTargetProbeReply";
     internal const string CallerAlias = "Graph.Tests.SystemTargetCaller";
+    internal const string CallbackReplyAlias = "Graph.Tests.SystemTargetCallbackReply";
+    internal const string CallbackMethodAlias = "service-callback";
+    internal const string ServiceCallbackMethodAlias = "call-service-callback";
+    internal const string CallbackTargetMethodAlias = "callback-target";
+    internal const string RefusedCallbackTargetMethodAlias = "refused-callback-target";
     internal const string ProbeMethodAlias = "probe";
     internal const string ServiceMethodAlias = "call-service";
     internal const string AllowedMethodAlias = "call-allowed";

@@ -1,3 +1,4 @@
+using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
 using ManagedCode.Orleans.Graph.Tests.SystemTargetCluster;
 using Microsoft.Extensions.DependencyInjection;
@@ -55,6 +56,42 @@ public class SystemTargetTrackingTests(SystemTargetTestCluster fixture)
         reply.ApplicationHistoryDepth.ShouldBeGreaterThan(0);
         reply.ContainsSystemTargetHistory.ShouldBeFalse();
     }
+
+    [Test]
+    public async Task NativeServiceCallbackUsesActualSourceAndRestoresHistoryAsync(CancellationToken cancellationToken)
+    {
+        using var deadline = CreateDeadline(cancellationToken);
+        var reply = await fixture.CreateCaller().CallServiceCallbackAsync(false, deadline.Token).WaitAsync(deadline.Token);
+        reply.Source.ShouldBe(typeof(SystemTargetProbeGrainService).FullName);
+        reply.SourceMethod.ShouldBe(Constants.AnyMethod);
+        reply.SourceMatchesService.ShouldBeTrue();
+        reply.ServiceCallerRestored.ShouldBeTrue();
+        reply.ServiceHistoryRestored.ShouldBeTrue();
+        reply.ParentCallerRestored.ShouldBeTrue();
+        reply.ParentHistoryRestored.ShouldBeTrue();
+    }
+
+    [Test]
+    public async Task NativeServiceCallbackRejectsMissingEdgeBeforeBodyAndAllowsHealthyFollowUpAsync(CancellationToken cancellationToken)
+    {
+        using var deadline = CreateDeadline(cancellationToken);
+        var caller = fixture.CreateCaller();
+        var before = CallbackExecutions();
+        var exception = await Should.ThrowAsync<InvalidOperationException>(() =>
+            caller.CallServiceCallbackAsync(true, deadline.Token).WaitAsync(deadline.Token));
+        exception.Message.ShouldStartWith(SystemTargetTestProtocol.TransitionDeniedPrefix);
+        exception.Message.ShouldContain(typeof(SystemTargetProbeGrainService).FullName!);
+        CallbackExecutions().ShouldBe(before);
+        var reply = await caller.CallServiceCallbackAsync(false, deadline.Token).WaitAsync(deadline.Token);
+        reply.SourceMatchesService.ShouldBeTrue();
+        reply.ParentCallerRestored.ShouldBeTrue();
+        reply.ParentHistoryRestored.ShouldBeTrue();
+        CallbackExecutions().ShouldBe(before + 1);
+    }
+
+    private int CallbackExecutions() => fixture.Cluster.Silos.Sum(silo =>
+        fixture.Cluster.GetSiloServiceProvider(silo.SiloAddress)
+            .GetRequiredService<SystemTargetProbeObservation>().CallbackExecutions);
 
     [Test]
     public async Task ApplicationTransitionsStillAllowConfiguredAndDenyMissingEdgesAsync(CancellationToken cancellationToken)

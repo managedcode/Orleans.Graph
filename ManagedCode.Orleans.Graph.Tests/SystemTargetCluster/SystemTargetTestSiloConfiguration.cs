@@ -15,6 +15,8 @@ public sealed class SystemTargetTestSiloConfiguration : ISiloConfigurator
         siloBuilder.AddOrleansGraph(configureGraph: graph =>
         {
             graph.AllowClientCallGrain<ISystemTargetCallerGrain>();
+            graph.AddGrainServiceTransition<SystemTargetProbeGrainService, ISystemTargetCallerGrain>(
+                nameof(ISystemTargetCallerGrain.CallbackTargetAsync));
             graph.AddGrainTransition<ISystemTargetCallerGrain, IGrainB>().MethodByName(
                 nameof(ISystemTargetCallerGrain.CallAllowedApplicationAsync), nameof(IGrainB.MethodB1));
         });

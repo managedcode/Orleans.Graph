@@ -16,7 +16,7 @@ public static class RequestContextHelper
 
     private static bool TrackIncomingCall(IIncomingGrainCallContext context, IInvokable request)
     {
-        var interfaceName = request.GetInterfaceName();
+        var interfaceName = request.GetInterfaceType().GetTypeName();
         var methodName = request.GetMethodName();
         EnsureValidGrainIdentity(interfaceName, methodName);
 
@@ -71,7 +71,7 @@ public static class RequestContextHelper
 
     private static bool TrackOutgoingCall(IOutgoingGrainCallContext context, IInvokable request)
     {
-        var interfaceName = request.GetInterfaceName();
+        var interfaceName = request.GetInterfaceType().GetTypeName();
         var methodName = request.GetMethodName();
         EnsureValidGrainIdentity(interfaceName, methodName);
 
@@ -218,6 +218,12 @@ public static class RequestContextHelper
         if (!context.SourceId.HasValue)
         {
             return new CurrentCallerContext(Constants.ClientCallerId, Constants.AnyMethod);
+        }
+
+        if (context.SourceId.Value.IsSystemTarget())
+        {
+            return ResolveSourceContextCaller(context, Constants.AnyMethod)
+                ?? new CurrentCallerContext(Constants.UnknownCallerId, Constants.AnyMethod);
         }
 
         if (RequestContext.Get(Constants.CurrentCallerContextKey) is CurrentCallerContext callerContext &&

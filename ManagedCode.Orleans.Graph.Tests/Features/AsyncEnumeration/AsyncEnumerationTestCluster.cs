@@ -61,6 +61,9 @@ internal static class AsyncEnumerationTestGraph
         graph.AllowClientCallGrain<IAsyncEnumerationSource>();
         graph.AllowClientCallGrain<IAsyncEnumerationOrigin>();
         graph.AllowClientCallGrain<IAsyncEnumerationCatalogProbe>();
+        graph.AllowClientCallGrain<IInheritedAsyncEnumeration<StreamItem>>();
+        graph.AddGrainTransition<IInheritedAsyncEnumeration<StreamItem>, IAsyncEnumerationLeaf>()
+            .MethodByName(nameof(IInheritedAsyncEnumeration<StreamItem>.InheritedAsync), nameof(IAsyncEnumerationLeaf.ObserveAsync));
         graph.AddGrainTransition<IAsyncEnumerationSource, IAsyncEnumerationLeaf>()
             .SpecificSourceMethodsToAllTargetMethods(nameof(IAsyncEnumerationSource.AllowedAsync));
         graph.AddGrainTransition<IAsyncEnumerationOrigin, IAsyncEnumerationSource>()
