@@ -228,3 +228,11 @@ dotnet tool run coverlet ManagedCode.Orleans.Graph.Tests/bin/Release/net10.0/Man
 ## License
 
 MIT - see [LICENSE](LICENSE).
+
+### Live telemetry shutdown
+
+The runtime call graph is in-memory diagnostic state, not a durable audit log.
+Telemetry workers flush buffered observations during ordinary deactivation and
+idle collection. During silo shutdown they release their buffers without issuing
+new grain calls: the last silo cannot activate an aggregation grain while its
+catalog is closing. Grain call-policy enforcement is unchanged.

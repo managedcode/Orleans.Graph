@@ -32,6 +32,14 @@ public sealed class OrleansGraphTelemetryWorker(GraphCallFilterConfig graphCallF
 
     public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
     {
+        if (reason.ReasonCode == DeactivationReasonCode.ShuttingDown)
+        {
+            // Live graph observations are process-local diagnostics, not durable records.
+            // The final silo cannot activate a telemetry target while its catalog closes.
+            _observedCalls.Clear();
+            return Task.CompletedTask;
+        }
+
         return FlushBufferedCallsAsync(deactivateWhenEmpty: false);
     }
 

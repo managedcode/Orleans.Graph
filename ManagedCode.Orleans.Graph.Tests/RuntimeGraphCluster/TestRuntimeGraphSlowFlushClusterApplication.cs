@@ -7,9 +7,9 @@ public class TestRuntimeGraphSlowFlushClusterApplication : IDisposable, IAsyncDi
 {
     private bool _disposed;
 
-    public TestRuntimeGraphSlowFlushClusterApplication()
+    public TestRuntimeGraphSlowFlushClusterApplication(short initialSilos = 2)
     {
-        var builder = new TestClusterBuilder();
+        var builder = new TestClusterBuilder(initialSilos);
         builder.AddSiloBuilderConfigurator<TestRuntimeGraphSlowFlushSiloConfigurations>();
         builder.AddClientBuilderConfigurator<TestRuntimeGraphClientConfigurations>();
         Cluster = builder.Build();

@@ -1,6 +1,8 @@
 using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
 using ManagedCode.Orleans.Graph.Tests.RuntimeGraphCluster;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace ManagedCode.Orleans.Graph.Tests;
 
@@ -39,6 +41,27 @@ public class RuntimeGraphTelemetryLifecycleTests
             graph => graph.Edges.Any(IsExpectedObservedEdge));
 
         graph.Edges.ShouldContain(edge => IsExpectedObservedEdge(edge));
+    }
+
+    [Test]
+    [Arguments((short)1)]
+    [Arguments((short)2)]
+    public async Task TelemetryWorker_LastSiloShutdownDoesNotSendToUnavailableTelemetryGrainAsync(short initialSilos)
+    {
+        await using var fixture = new TestRuntimeGraphSlowFlushClusterApplication(initialSilos);
+        using var logs = new ShutdownTelemetryLogObserver();
+        foreach (var silo in fixture.Cluster.Silos)
+        {
+            fixture.Cluster.GetSiloServiceProvider(silo.SiloAddress)
+                .GetRequiredService<ILoggerFactory>().AddProvider(logs);
+        }
+        var worker = fixture.Cluster.Client.GetGrain<IOrleansGraphTelemetryWorker>(Constants.LiveGraphTelemetryGrainKey);
+        await worker.RecordObservedCallAsync(ObservedGrainCall.Create(
+            "source", "target", "SourceMethod", "TargetMethod"));
+
+        await fixture.Cluster.StopAllSilosAsync();
+
+        logs.Failures.ShouldBe(0);
     }
 
     private static async Task AssertActivationCollectedAsync(IGrainFactory grainFactory, IAddressable grainReference)
