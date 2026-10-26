@@ -233,6 +233,7 @@ MIT - see [LICENSE](LICENSE).
 
 The runtime call graph is in-memory diagnostic state, not a durable audit log.
 Telemetry workers flush buffered observations during ordinary deactivation and
-idle collection. During silo shutdown they release their buffers without issuing
+idle collection. Once the host or silo starts stopping, and during cancelled
+deactivation, workers release their buffers without issuing
 new grain calls: the last silo cannot activate an aggregation grain while its
 catalog is closing. Grain call-policy enforcement is unchanged.

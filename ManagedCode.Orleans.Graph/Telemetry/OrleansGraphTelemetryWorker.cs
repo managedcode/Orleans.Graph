@@ -2,12 +2,16 @@ using System.Runtime.InteropServices;
 using ManagedCode.Orleans.Graph.Extensions;
 using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
+using Microsoft.Extensions.Hosting;
 using Orleans.Concurrency;
 
 namespace ManagedCode.Orleans.Graph.Telemetry;
 
 [StatelessWorker(1)]
-public sealed class OrleansGraphTelemetryWorker(GraphCallFilterConfig graphCallFilterConfig) : Grain, IOrleansGraphTelemetryWorker, IObservedGrainCallSink
+public sealed class OrleansGraphTelemetryWorker(
+    GraphCallFilterConfig graphCallFilterConfig,
+    IHostApplicationLifetime applicationLifetime,
+    ISiloStatusOracle siloStatusOracle) : Grain, IOrleansGraphTelemetryWorker, IObservedGrainCallSink
 {
     private readonly Dictionary<ObservedGrainCallKey, ObservedGrainCallAccumulator> _observedCalls = new();
 
@@ -32,7 +36,7 @@ public sealed class OrleansGraphTelemetryWorker(GraphCallFilterConfig graphCallF
 
     public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
     {
-        if (reason.ReasonCode == DeactivationReasonCode.ShuttingDown)
+        if (reason.ReasonCode == DeactivationReasonCode.ShuttingDown || cancellationToken.IsCancellationRequested)
         {
             // Live graph observations are process-local diagnostics, not durable records.
             // The final silo cannot activate a telemetry target while its catalog closes.
@@ -64,6 +68,14 @@ public sealed class OrleansGraphTelemetryWorker(GraphCallFilterConfig graphCallF
 
     private async Task FlushBufferedCallsAsync(bool deactivateWhenEmpty)
     {
+        if (applicationLifetime.ApplicationStopping.IsCancellationRequested ||
+            applicationLifetime.ApplicationStopped.IsCancellationRequested ||
+            siloStatusOracle.CurrentStatus.IsTerminating())
+        {
+            _observedCalls.Clear();
+            return;
+        }
+
         if (_observedCalls.Count == 0)
         {
             if (deactivateWhenEmpty)

@@ -2,6 +2,7 @@ using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
 using ManagedCode.Orleans.Graph.Tests.RuntimeGraphCluster;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace ManagedCode.Orleans.Graph.Tests;
@@ -61,6 +62,41 @@ public class RuntimeGraphTelemetryLifecycleTests
 
         await fixture.Cluster.StopAllSilosAsync();
 
+        logs.Failures.ShouldBe(0);
+    }
+
+    [Test]
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task TelemetryWorker_HostStoppingDoesNotFlushBufferedCallsAsync(bool explicitFlush)
+    {
+        await using var fixture = new TestRuntimeGraphSlowFlushClusterApplication(1);
+        var grains = fixture.Cluster.Client;
+        var worker = grains.GetGrain<IOrleansGraphTelemetryWorker>(Constants.LiveGraphTelemetryGrainKey);
+        await worker.RecordObservedCallAsync(ObservedGrainCall.Create(
+            "source", "target", "SourceMethod", "TargetMethod"));
+
+        using var logs = new ShutdownTelemetryLogObserver();
+        foreach (var silo in fixture.Cluster.Silos)
+        {
+            var services = fixture.Cluster.GetSiloServiceProvider(silo.SiloAddress);
+            services.GetRequiredService<ILoggerFactory>().AddProvider(logs);
+            services.GetRequiredService<IHostApplicationLifetime>().StopApplication();
+        }
+
+        if (explicitFlush)
+        {
+            await worker.FlushAsync();
+        }
+
+        else
+        {
+            await grains.GetGrain<IManagementGrain>(0).ForceActivationCollection(TimeSpan.Zero);
+        }
+
+        var graph = await grains.GetGrain<IOrleansGraphTelemetryGrain>(Constants.LiveGraphTelemetryGrainKey)
+            .GetObservedGraphAsync();
+        graph.Edges.ShouldNotContain(edge => IsExpectedObservedEdge(edge));
         logs.Failures.ShouldBe(0);
     }
 
