@@ -15,4 +15,8 @@ public class GraphCallFilterConfig
 
     [Id(2)]
     public TimeSpan LiveGraphFlushPeriod { get; set; } = DefaultLiveGraphFlushPeriod;
+
+    /// <summary>Automatically reports runtime calls to the live graph workers. Policy enforcement remains active when disabled.</summary>
+    [Id(3)]
+    public bool EnableLiveGraphTelemetry { get; set; } = true;
 }

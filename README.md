@@ -109,6 +109,8 @@ siloBuilder.AddOrleansGraph(
 clientBuilder.AddOrleansGraph();
 ```
 
+Automatic live graph collection is enabled by default. Applications that only need call-policy enforcement can set `filters.EnableLiveGraphTelemetry = false` in `configureFilters`. This removes automatic telemetry-worker RPCs while preserving the same permitted and refused transitions, call-history isolation and asynchronous enumeration checks. The observed runtime graph remains empty until explicitly recorded; Orleans host tracing and metrics have their own configuration.
+
 After your app receives traffic, read the observed graph from the telemetry grain.
 
 ```csharp

@@ -12,6 +12,7 @@ public class GraphCallFilterConfigTests
         config.TrackOrleansCalls.ShouldBeFalse();
         config.TrackOrleansGraphInternalCalls.ShouldBeFalse();
         config.LiveGraphFlushPeriod.ShouldBe(TimeSpan.FromSeconds(30));
+        config.EnableLiveGraphTelemetry.ShouldBeTrue();
     }
 
     [Test]

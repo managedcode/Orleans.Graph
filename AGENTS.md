@@ -39,6 +39,7 @@ Update guidelines:
 - **Runtime Graph API Shape**: Expose live telemetry as a graph model with explicit `Vertices` and `Edges`; Mermaid output is only a renderer for that same graph, while methods/counts/timestamps belong on edges.
 - **No Silent Fallbacks**: In call tracking and runtime graph code, never substitute wildcard methods, base `Grain`, reflection guesses, or history scans when exact caller identity is required; `UNKNOWN_CALLER` is the only allowed unresolved caller marker.
 - **Filter Hot Path**: Keep Orleans call filters O(1) on request context data; avoid reflection, interface scanning, or call-history searching in the hot path so graph tracking stays cheap.
+- **Optional Live Graph Telemetry**: Keep automatic live graph collection independently configurable from call-policy enforcement. When collection is disabled, filters must send no telemetry-worker RPC and still enforce the same permitted and refused real calls.
 - **Telemetry Filtering**: Do not track Orleans.Graph internal telemetry calls by default; expose a configuration switch to include them, and test both filtered and full-tracking modes.
 - **Testing Scope**: Exercise new behavior through the Orleans-hosted integration tests in `ManagedCode.Orleans.Graph.Tests`, covering both positive and negative paths to mirror real cluster flows.
 - **Cluster-to-Cluster Tests**: For grain-only runtime graph scenarios, add coverage that starts from a silo-side `IGrainFactory` instead of `IClusterClient`, so client-origin edges cannot hide cluster-to-cluster behavior.

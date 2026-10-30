@@ -77,6 +77,11 @@ public class GraphIncomingGrainCallFilter(IServiceProvider serviceProvider, Grap
 
     private async Task ReportObservedEdgeAsync(IIncomingGrainCallContext context, CallHistory callHistory)
     {
+        if (!graphCallFilterConfig.EnableLiveGraphTelemetry)
+        {
+            return;
+        }
+
         var observedCall = GrainTransitionManager.GetLatestObservedCall(callHistory);
         if (observedCall is null)
         {
