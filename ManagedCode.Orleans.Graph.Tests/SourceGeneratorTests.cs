@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
@@ -31,6 +33,71 @@ public interface GrainA : IGrain { }
 public interface GrainB : IGrain { }
 ";
 
+        RunGenerator(source).ShouldContain(d => d.Id == "GCB001");
+    }
+
+    [Test]
+    [Arguments("AddGrain<GrainA>()")]
+    [Arguments("AddGrainTransition<GrainA, GrainA>()")]
+    public void SourceGenerator_AllowsSameGrainRules(string rule)
+    {
+        var source = $$"""
+            using ManagedCode.Orleans.Graph;
+            using Orleans;
+
+            public static class GraphSetup
+            {
+                public static void Configure() => GrainCallsBuilder.Create()
+                    .{{rule}}.AllMethods().And().Build();
+            }
+
+            public interface GrainA : IGrain { }
+            """;
+
+        RunGenerator(source).ShouldBeEmpty();
+    }
+
+    [Test]
+    public void SourceGenerator_AllowsDeepAcyclicGraphWithRepeatedEdges()
+    {
+        const int depth = 4096;
+        var source = new StringBuilder("""
+            using ManagedCode.Orleans.Graph;
+            using Orleans;
+            using System;
+
+            public static class GraphSetup
+            {
+                public static void Configure() => CreateGraph(builder =>
+                {
+            """);
+        source.AppendLine();
+
+        for (var index = 1; index < depth; index++)
+        {
+            source.AppendLine(CultureInfo.InvariantCulture, $"builder.AddGrainTransition<Grain{index - 1}, Grain{index}>().AllMethods();");
+        }
+
+        source.AppendLine("""
+                    builder.AddGrainTransition<Grain0, Grain1>().AllMethods();
+                    builder.AddGrainTransition<Grain0, Grain2>().AllMethods();
+                });
+
+                private static void CreateGraph(Action<IGrainCallsBuilder> configure) =>
+                    configure(GrainCallsBuilder.Create());
+            }
+            """);
+
+        for (var index = 0; index < depth; index++)
+        {
+            source.AppendLine(CultureInfo.InvariantCulture, $"public interface Grain{index} : IGrain {{ }}");
+        }
+
+        RunGenerator(source.ToString()).ShouldBeEmpty();
+    }
+
+    private static IReadOnlyCollection<Diagnostic> RunGenerator(string source)
+    {
         var syntaxTree = CSharpSyntaxTree.ParseText(source, new CSharpParseOptions(LanguageVersion.Preview));
         var references = CreateReferences();
 
@@ -42,9 +109,9 @@ public interface GrainB : IGrain { }
 
         var generator = new GrainCallsBuilderSourceGenerator();
         GeneratorDriver driver = CSharpGeneratorDriver.Create(generator);
-        driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out _, out var diagnostics);
+        driver.RunGeneratorsAndUpdateCompilation(compilation, out _, out var diagnostics);
 
-        diagnostics.ShouldContain(d => d.Id == "GCB001");
+        return diagnostics;
     }
 
     private static IEnumerable<MetadataReference> CreateReferences()

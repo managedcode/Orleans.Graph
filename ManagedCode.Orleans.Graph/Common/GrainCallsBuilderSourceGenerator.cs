@@ -1,5 +1,6 @@
 // Suppress analyzer packaging warnings for in-assembly generator.
 #pragma warning disable RS1036, RS1038, RS1041, RS1042, RS2008
+using System.Runtime.InteropServices;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -46,46 +47,22 @@ public class GrainCallsBuilderSourceGenerator : ISourceGenerator
     {
         var transitions = new List<(ITypeSymbol, ITypeSymbol)>();
 
-        var addTransitionCalls = graphConfig.DescendantNodes()
-            .OfType<InvocationExpressionSyntax>()
-            .Where(i =>
-            {
-                if (i.Expression is MemberAccessExpressionSyntax { Name: GenericNameSyntax genericName })
-                {
-                    return genericName.Identifier.Text is "AddGrainTransition" or "AddGrain";
-                }
-
-                return false;
-            });
-
-        foreach (var call in addTransitionCalls)
+        foreach (var call in graphConfig.DescendantNodes().OfType<InvocationExpressionSyntax>())
         {
-            if (call.Expression is not MemberAccessExpressionSyntax { Name: GenericNameSyntax genericName })
+            if (call.Expression is not MemberAccessExpressionSyntax { Name: GenericNameSyntax genericName } ||
+                genericName.Identifier.ValueText != nameof(IGrainCallsBuilder.AddGrainTransition) ||
+                genericName.TypeArgumentList.Arguments.Count != 2)
             {
                 continue;
             }
 
-            if (genericName.Identifier.Text == "AddGrainTransition" && genericName.TypeArgumentList.Arguments.Count == 2)
+            var sourceType = model.GetTypeInfo(genericName.TypeArgumentList.Arguments[0]).Type;
+            var targetType = model.GetTypeInfo(genericName.TypeArgumentList.Arguments[1]).Type;
+            // Same-interface rules are excluded from the runtime policy cycle check.
+            if (sourceType is not null && targetType is not null &&
+                !SymbolEqualityComparer.Default.Equals(sourceType, targetType))
             {
-                var sourceArg = genericName.TypeArgumentList.Arguments[0];
-                var targetArg = genericName.TypeArgumentList.Arguments[1];
-
-                var sourceType = model.GetTypeInfo(sourceArg).Type;
-                var targetType = model.GetTypeInfo(targetArg).Type;
-
-                if (sourceType != null && targetType != null)
-                {
-                    transitions.Add((sourceType, targetType));
-                }
-            }
-            else if (genericName.Identifier.Text == "AddGrain" && genericName.TypeArgumentList.Arguments.Count == 1)
-            {
-                var typeArg = genericName.TypeArgumentList.Arguments[0];
-                var type = model.GetTypeInfo(typeArg).Type;
-                if (type != null)
-                {
-                    transitions.Add((type, type));
-                }
+                transitions.Add((sourceType, targetType));
             }
         }
 
@@ -94,58 +71,44 @@ public class GrainCallsBuilderSourceGenerator : ISourceGenerator
 
     private static bool HasCycles(IEnumerable<(ITypeSymbol Source, ITypeSymbol Target)> transitions)
     {
-        var graph = new Dictionary<ITypeSymbol, HashSet<ITypeSymbol>>(SymbolEqualityComparer.Default);
+        var graph = new Dictionary<ITypeSymbol, (List<ITypeSymbol>? Targets, int Incoming)>(SymbolEqualityComparer.Default);
 
         foreach (var (source, target) in transitions)
         {
-            if (!graph.TryGetValue(source, out var neighbors))
-            {
-                neighbors = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
-                graph[source] = neighbors;
-            }
-
-            neighbors.Add(target);
+            ref var sourceNode = ref CollectionsMarshal.GetValueRefOrAddDefault(graph, source, out _);
+            (sourceNode.Targets ??= []).Add(target);
+            CollectionsMarshal.GetValueRefOrAddDefault(graph, target, out _).Incoming++;
         }
 
-        var visited = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
-        var recursionStack = new HashSet<ITypeSymbol>(SymbolEqualityComparer.Default);
-
-        foreach (var vertex in graph.Keys)
+        var ready = new Queue<ITypeSymbol>();
+        foreach (var (vertex, node) in graph)
         {
-            if (IsCyclicUtil(vertex, graph, visited, recursionStack))
+            if (node.Incoming == 0)
             {
-                return true;
+                ready.Enqueue(vertex);
             }
         }
 
-        return false;
-    }
-
-    private static bool IsCyclicUtil(ITypeSymbol vertex, Dictionary<ITypeSymbol, HashSet<ITypeSymbol>> graph, HashSet<ITypeSymbol> visited, HashSet<ITypeSymbol> recursionStack)
-    {
-        if (!visited.Contains(vertex))
+        var remaining = graph.Count;
+        while (ready.TryDequeue(out var source))
         {
-            _ = visited.Add(vertex);
-            recursionStack.Add(vertex);
-
-            if (graph.TryGetValue(vertex, out var neighbors))
+            remaining--;
+            if (graph[source].Targets is not { } targets)
             {
-                foreach (var neighbor in neighbors)
+                continue;
+            }
+
+            foreach (var target in targets)
+            {
+                ref var targetNode = ref CollectionsMarshal.GetValueRefOrNullRef(graph, target);
+                if (--targetNode.Incoming == 0)
                 {
-                    if (!visited.Contains(neighbor) && IsCyclicUtil(neighbor, graph, visited, recursionStack))
-                    {
-                        return true;
-                    }
-                    if (recursionStack.Contains(neighbor))
-                    {
-                        return true;
-                    }
+                    ready.Enqueue(target);
                 }
             }
         }
 
-        recursionStack.Remove(vertex);
-        return false;
+        return remaining > 0;
     }
 
     private class GrainCallsBuilderSyntaxReceiver : ISyntaxReceiver

@@ -52,9 +52,11 @@ public static class RequestContextHelper
 
     internal static bool TrackIncomingCall(this IIncomingGrainCallContext context, GraphCallFilterConfig graphCallFilterConfig, IInvokable? originalRequest)
     {
-        var request = originalRequest ?? context.Request;
-        var module = originalRequest is null ? context.ImplementationMethod.Module : originalRequest.GetMethod().Module;
-        if (context.ShouldSkipTracking(graphCallFilterConfig, module, request))
+        var envelope = context.Request;
+        var request = originalRequest ?? envelope;
+        if (context.ShouldSkipTracking(graphCallFilterConfig, request) ||
+            (!graphCallFilterConfig.TrackOrleansCalls &&
+             IsExcludedOrleansModule(originalRequest is null ? context.ImplementationMethod.Module : originalRequest.GetMethod().Module, envelope)))
         {
             return false;
         }
@@ -73,9 +75,11 @@ public static class RequestContextHelper
 
     internal static bool TrackOutgoingCall(this IOutgoingGrainCallContext context, GraphCallFilterConfig graphCallFilterConfig, IInvokable? originalRequest)
     {
-        var request = originalRequest ?? context.Request;
-        var module = originalRequest is null ? context.InterfaceMethod.Module : originalRequest.GetMethod().Module;
-        if (context.ShouldSkipTracking(graphCallFilterConfig, module, request))
+        var envelope = context.Request;
+        var request = originalRequest ?? envelope;
+        if (context.ShouldSkipTracking(graphCallFilterConfig, request) ||
+            (!graphCallFilterConfig.TrackOrleansCalls &&
+             IsExcludedOrleansModule(originalRequest is null ? context.InterfaceMethod.Module : originalRequest.GetMethod().Module, envelope)))
         {
             return false;
         }
@@ -208,28 +212,20 @@ public static class RequestContextHelper
         }
     }
 
-    private static bool ShouldSkipTracking(this IGrainCallContext context, GraphCallFilterConfig graphCallFilterConfig, Module module, IInvokable request)
+    private static bool ShouldSkipTracking(this IGrainCallContext context, GraphCallFilterConfig graphCallFilterConfig, IInvokable request)
     {
-        if (!graphCallFilterConfig.TrackOrleansCalls &&
-            (context.TargetId.IsSystemTarget() ||
-             (_moduleNames.GetValue(module, static key => key.Name).StartsWith("Orleans.", StringComparison.Ordinal) &&
-              !IsActivationCallbackCaller(context.Request.GetInterfaceName()))))
+        if (!graphCallFilterConfig.TrackOrleansCalls && context.TargetId.IsSystemTarget())
         {
             return true;
         }
 
-        if (!graphCallFilterConfig.TrackOrleansGraphInternalCalls && IsOrleansGraphTelemetryRequest(request))
-        {
-            return true;
-        }
-
-        if (!graphCallFilterConfig.TrackOrleansGraphInternalCalls && IsTelemetrySuppressed())
-        {
-            return true;
-        }
-
-        return false;
+        return !graphCallFilterConfig.TrackOrleansGraphInternalCalls &&
+            (IsOrleansGraphTelemetryRequest(request) || IsTelemetrySuppressed());
     }
+
+    private static bool IsExcludedOrleansModule(Module module, IInvokable envelope) =>
+        _moduleNames.GetValue(module, static key => key.Name).StartsWith("Orleans.", StringComparison.Ordinal) &&
+        !IsActivationCallbackCaller(envelope.GetInterfaceName());
 
     private static CurrentCallerContext ResolveCaller(IOutgoingGrainCallContext context)
     {

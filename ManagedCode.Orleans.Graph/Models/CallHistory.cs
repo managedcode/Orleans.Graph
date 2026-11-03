@@ -25,15 +25,34 @@ public class CallHistory
     public CallHistory Fork(bool detach = false)
     {
         var branch = new CallHistory { Id = Id };
-        if (!detach)
+        if (detach)
         {
-            branch.NativeCallChainScopes = [.. NativeCallChainScopes];
-            var calls = History.ToArray();
-            branch.History.EnsureCapacity(calls.Length);
-            for (var index = calls.Length - 1; index >= 0; index--)
+            return branch;
+        }
+
+        branch.NativeCallChainScopes = [.. NativeCallChainScopes];
+        if (History.Count <= 2)
+        {
+            var callsInOrder = History.GetEnumerator();
+            if (callsInOrder.MoveNext())
             {
-                branch.Push(calls[index]);
+                var latest = callsInOrder.Current;
+                if (callsInOrder.MoveNext())
+                {
+                    branch.Push(callsInOrder.Current);
+                }
+
+                branch.Push(latest);
             }
+
+            return branch;
+        }
+
+        var calls = History.ToArray();
+        branch.History.EnsureCapacity(calls.Length);
+        for (var index = calls.Length - 1; index >= 0; index--)
+        {
+            branch.Push(calls[index]);
         }
 
         return branch;

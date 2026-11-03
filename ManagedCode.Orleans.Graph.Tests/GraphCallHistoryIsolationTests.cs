@@ -18,11 +18,21 @@ public class GraphCallHistoryIsolationTests(TestRuntimeGraphClusterApplication f
     }
 
     [Test]
-    public async Task OneWayIncomingCallStartsDetachedWaitChainAsync()
+    [Arguments(false)]
+    [Arguments(true)]
+    public async Task OneWayIncomingCallStartsDetachedWaitChainAsync(bool selfCall)
     {
         var key = Guid.NewGuid().ToString("N");
-        await fixture.Cluster.Client.GetGrain<IGrainA>(key).StartOneWayHistoryProbeAsync();
         var grain = fixture.Cluster.Client.GetGrain<IGrainB>(key);
+        if (selfCall)
+        {
+            await grain.DispatchOneWayToSelfAsync().WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        else
+        {
+            await fixture.Cluster.Client.GetGrain<IGrainA>(key).StartOneWayHistoryProbeAsync();
+        }
+
         int? depth = null;
         for (var attempt = 0; attempt < 50 && depth is null; attempt++)
         {

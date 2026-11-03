@@ -76,6 +76,20 @@ public class GraphTests(TestClusterApplication testApp)
     }
 
     [Test]
+    public async Task SelfReentrancyPolicyStillDetectsCycleBetweenDistinctGrainsAsync()
+    {
+        var rootKey = Guid.NewGuid().ToString("N");
+        var peerKey = Guid.NewGuid().ToString("N");
+        var grain = _testApp.Cluster.Client.GetGrain<IGrainA>(rootKey);
+
+        (await grain.CallPeerAsync(peerKey, 1).WaitAsync(TimeSpan.FromSeconds(5))).ShouldBe(peerKey);
+
+        var exception = await Should.ThrowAsync<InvalidOperationException>(
+            () => grain.CallPeerAsync(peerKey, 2).WaitAsync(TimeSpan.FromSeconds(5)));
+        exception.Message.ShouldStartWith("Deadlock detected.");
+    }
+
+    [Test]
     public async Task DeadLock_TestsAsync()
     {
         var exception = await Should.ThrowAsync<InvalidOperationException>(async () =>

@@ -9,6 +9,8 @@ public interface IGrainB : IGrainWithStringKey
 
     Task<int> GetCallHistoryDepthAsync();
 
+    Task DispatchOneWayToSelfAsync();
+
     [OneWay]
     Task RecordOneWayHistoryDepthAsync();
 

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Runtime.InteropServices;
 using System.Text;
 using ManagedCode.Orleans.Graph.Interfaces;
@@ -11,6 +12,8 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
     private readonly DirectedGraph _grainGraph = grainGraph ?? throw new ArgumentNullException(nameof(grainGraph));
     private readonly bool _allowAllByDefault = allowAllByDefault;
     private static readonly Comparison<ObservedGrainCall> _observedCallComparison = CompareObservedCalls;
+    private static readonly ObservedGrainCallGraph _emptyObservedGraph = new(
+        Array.Empty<ObservedGrainCallVertex>(), Array.Empty<ObservedGrainCall>());
 
     public bool IsTransitionAllowed(CallHistory callHistory, bool throwOnViolation = false)
     {
@@ -152,29 +155,26 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
             return false;
         }
 
-        var graph = new Dictionary<GrainId, List<GrainId>>(callHistory.History.Count);
+        var calls = callHistory.History.ToArray();
+        Dictionary<GrainId, List<GrainId>>? graph = null;
         HashSet<GrainId>? visited = null;
 
-        foreach (var historyEntry in callHistory.History.Reverse())
+        for (var index = calls.Length - 1; index >= 0; index--)
         {
-            if (historyEntry is not OutCall call)
+            if (calls[index] is not OutCall { SourceId: { } source, TargetId: { } target } call ||
+                !IsWaitEdge(call))
             {
                 continue;
             }
 
-            if (!call.SourceId.HasValue || !call.TargetId.HasValue)
+            if (source.Equals(target))
             {
-                continue;
+                if (!CanInterleaveCall(call, callHistory))
+                {
+                    return ReportDeadlock(source, throwOnViolation);
+                }
             }
-
-            if (IsReentrantSelfCall(call))
-            {
-                continue;
-            }
-
-            var source = call.SourceId.Value;
-            var target = call.TargetId.Value;
-            if ((source.Equals(target) || graph.ContainsKey(target)) && !CanInterleaveCall(call, callHistory))
+            else if (graph is not null && graph.ContainsKey(target) && !CanInterleaveCall(call, callHistory))
             {
                 visited ??= new HashSet<GrainId>();
                 if (CanReach(target, source, graph, visited))
@@ -185,6 +185,7 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
                 visited.Clear();
             }
 
+            graph ??= new Dictionary<GrainId, List<GrainId>>(calls.Length);
             ref var neighbors = ref CollectionsMarshal.GetValueRefOrAddDefault(graph, source, out var exists);
             if (!exists || neighbors is null)
             {
@@ -211,7 +212,7 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
             return false;
         }
 
-        if (IsReentrantSelfCall(latestCall) || CanInterleaveCall(latestCall, callHistory))
+        if (!IsWaitEdge(latestCall) || CanInterleaveCall(latestCall, callHistory))
         {
             return false;
         }
@@ -229,7 +230,7 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
         while (earlier.MoveNext())
         {
             if (earlier.Current is OutCall { SourceId: { } source, TargetId: not null } call &&
-                source.Equals(targetId) && !IsReentrantSelfCall(call))
+                source.Equals(targetId) && IsWaitEdge(call))
             {
                 hasPathStart = true;
                 break;
@@ -256,7 +257,7 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
                 continue;
             }
 
-            if (IsReentrantSelfCall(call))
+            if (!IsWaitEdge(call))
             {
                 continue;
             }
@@ -278,11 +279,18 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
         return ReportDeadlock(sourceId, throwOnViolation);
     }
 
-    private bool IsReentrantSelfCall(OutCall call)
+    private bool IsWaitEdge(OutCall call)
     {
-        return !string.IsNullOrWhiteSpace(call.Caller) &&
-               string.Equals(call.Caller, call.Interface, StringComparison.Ordinal) &&
-               _grainGraph.HasReentrantTransition(call.Caller, call.Interface);
+        if ((call.InvocationOptions & InvokeMethodOptions.OneWay) != 0)
+        {
+            return false;
+        }
+
+        var isReentrantSelfCall = call.SourceId == call.TargetId &&
+            !string.IsNullOrWhiteSpace(call.Caller) &&
+            string.Equals(call.Caller, call.Interface, StringComparison.Ordinal) &&
+            _grainGraph.HasReentrantTransition(call.Caller, call.Interface);
+        return !isReentrantSelfCall;
     }
 
     private static bool CanInterleaveCall(OutCall call, CallHistory history)
@@ -378,7 +386,7 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
 
     public string GeneratePolicyMermaidDiagram()
     {
-        return GenerateMermaidDiagramInternal(null, null);
+        return GenerateMermaidDiagramInternal(null);
     }
 
     public IReadOnlyCollection<GrainTransitionEdge> GetPolicyEdges()
@@ -389,11 +397,13 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
             .Select(static edge => new GrainTransitionEdge(
                 edge.Source,
                 edge.Target,
-                edge.Transitions
-                    .OrderBy(static transition => transition.SourceMethod, StringComparer.Ordinal)
-                    .ThenBy(static transition => transition.TargetMethod, StringComparer.Ordinal)
-                    .ThenBy(static transition => transition.IsReentrant)
-                    .ToArray()))
+                edge.Transitions.Count <= 1
+                    ? edge.Transitions.ToArray()
+                    : edge.Transitions
+                        .OrderBy(static transition => transition.SourceMethod, StringComparer.Ordinal)
+                        .ThenBy(static transition => transition.TargetMethod, StringComparer.Ordinal)
+                        .ThenBy(static transition => transition.IsReentrant)
+                        .ToArray()))
             .ToArray();
     }
 
@@ -401,40 +411,30 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
     {
         ArgumentNullException.ThrowIfNull(callHistory);
 
-        var observedGraph = GetObservedGraph(callHistory);
-
-        return GenerateLiveMermaidDiagram(observedGraph);
+        return GenerateMermaidDiagramInternal(GetObservedCalls(callHistory));
     }
 
     public string GenerateLiveMermaidDiagram(ObservedGrainCallGraph observedGraph)
     {
         ArgumentNullException.ThrowIfNull(observedGraph);
 
-        return GenerateLiveMermaidDiagramFromObservedCalls(observedGraph.Edges);
-    }
-
-    private string GenerateLiveMermaidDiagramFromObservedCalls(IEnumerable<ObservedGrainCall> observedCalls)
-    {
+        var observedCalls = observedGraph.Edges;
         ArgumentNullException.ThrowIfNull(observedCalls);
-
-        var edgeArray = observedCalls as ObservedGrainCall[] ?? observedCalls.ToArray();
-        var highlightedEdges = new HashSet<(string Source, string Target)>(edgeArray.Length);
-        foreach (var edge in edgeArray)
-        {
-            highlightedEdges.Add((edge.Source, edge.Target));
-        }
-
-        var usageCounts = BuildUsageCounts(edgeArray);
-
-        return GenerateMermaidDiagramInternal(highlightedEdges, usageCounts, edgeArray);
+        return GenerateMermaidDiagramInternal(observedCalls);
     }
 
     public static string GenerateObservedGraphMermaidDiagram(ObservedGrainCallGraph observedGraph)
     {
         ArgumentNullException.ThrowIfNull(observedGraph);
 
+        return GenerateObservedCallsMermaidDiagram(observedGraph.Edges);
+    }
+
+    internal static string GenerateObservedCallsMermaidDiagram(IReadOnlyCollection<ObservedGrainCall> observedCalls)
+    {
+        ArgumentNullException.ThrowIfNull(observedCalls);
         var manager = new GrainTransitionManager(new DirectedGraph());
-        return manager.GenerateLiveMermaidDiagram(observedGraph);
+        return manager.GenerateMermaidDiagramInternal(observedCalls);
     }
 
     public static ObservedGrainCallGraph BuildObservedGraph(IEnumerable<ObservedGrainCall> observedCalls)
@@ -448,27 +448,44 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
     internal static ObservedGrainCallGraph BuildObservedGraphFromSnapshot(ObservedGrainCall[] edges)
     {
         ArgumentNullException.ThrowIfNull(edges);
+        if (edges.Length == 0)
+        {
+            return _emptyObservedGraph;
+        }
 
         Array.Sort(edges, _observedCallComparison);
 
-        var vertexSet = new HashSet<string>(edges.Length * 2, StringComparer.Ordinal);
+        // Count at most one source per source group and one target per endpoint pair.
+        var vertexCapacity = 2;
+        for (var edgeIndex = 1; edgeIndex < edges.Length; edgeIndex++)
+        {
+            var previous = edges[edgeIndex - 1];
+            var current = edges[edgeIndex];
+            if (!string.Equals(previous.Source, current.Source, StringComparison.Ordinal))
+            {
+                vertexCapacity += 2;
+            }
+            else if (!string.Equals(previous.Target, current.Target, StringComparison.Ordinal))
+            {
+                vertexCapacity++;
+            }
+        }
+
+        var vertexSet = new HashSet<string>(vertexCapacity, StringComparer.Ordinal);
         foreach (var edge in edges)
         {
             vertexSet.Add(edge.Source);
             vertexSet.Add(edge.Target);
         }
 
-        var vertexIds = new string[vertexSet.Count];
-        vertexSet.CopyTo(vertexIds);
-        Array.Sort(vertexIds, StringComparer.Ordinal);
-
-        var vertices = new ObservedGrainCallVertex[vertexIds.Length];
-        for (var i = 0; i < vertexIds.Length; i++)
+        var vertices = new ObservedGrainCallVertex[vertexSet.Count];
+        var index = 0;
+        foreach (var vertexId in vertexSet)
         {
-            var vertexId = vertexIds[i];
-            vertices[i] = new ObservedGrainCallVertex(vertexId, ToDisplayName(vertexId));
+            vertices[index++] = new ObservedGrainCallVertex(vertexId, ToDisplayName(vertexId));
         }
 
+        Array.Sort(vertices, static (left, right) => string.Compare(left.Id, right.Id, StringComparison.Ordinal));
         return new ObservedGrainCallGraph(vertices, edges);
     }
 
@@ -484,23 +501,20 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
     {
         ArgumentNullException.ThrowIfNull(callHistory);
 
-        if (callHistory.IsEmpty())
-        {
-            return new ObservedGrainCallGraph(Array.Empty<ObservedGrainCallVertex>(), Array.Empty<ObservedGrainCall>());
-        }
+        var observedCalls = GetObservedCalls(callHistory);
+        return BuildObservedGraphFromSnapshot(observedCalls as ObservedGrainCall[] ?? observedCalls.ToArray());
+    }
 
+    private static IReadOnlyCollection<ObservedGrainCall> GetObservedCalls(CallHistory callHistory)
+    {
         var calls = callHistory.History;
-        var edges = new Dictionary<ObservedGrainCallKey, ObservedGrainCall>(Math.Max(1, calls.Count / 2));
-
-        if (TryGetSingleIncomingClientCall(calls, out var incomingClientCall))
+        if (calls.Count <= 2)
         {
-            AddObservedEdge(edges, ObservedGrainCall.Create(
-                Constants.ClientCallerId,
-                GetObservedTarget(incomingClientCall),
-                Constants.AnyMethod,
-                incomingClientCall.Method));
+            var observedCall = GetLatestObservedCall(callHistory);
+            return observedCall is null ? Array.Empty<ObservedGrainCall>() : new[] { observedCall };
         }
 
+        Dictionary<ObservedGrainCallKey, ObservedGrainCall>? edges = null;
         Call? nextCall = null;
         foreach (var currentCall in calls)
         {
@@ -520,7 +534,8 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
                 ? ResolveSourceMethod(sourceOutCall)
                 : currentCall.Method;
 
-            AddObservedEdge(edges, ObservedGrainCall.Create(
+            edges ??= new Dictionary<ObservedGrainCallKey, ObservedGrainCall>(calls.Count / 2);
+            AddObservedEdge(edges, new ObservedGrainCallKey(
                 GetObservedSource(currentCall),
                 GetObservedTarget(nextCall),
                 sourceMethod,
@@ -529,7 +544,7 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
             nextCall = currentCall;
         }
 
-        return BuildObservedGraph(edges.Values);
+        return edges is null ? Array.Empty<ObservedGrainCall>() : edges.Values;
     }
 
     public static ObservedGrainCall? GetLatestObservedCall(CallHistory callHistory)
@@ -586,149 +601,172 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
             incomingCall.Method);
     }
 
-    private string GenerateMermaidDiagramInternal(
-        HashSet<(string Source, string Target)>? highlightedEdges,
-        Dictionary<(string Source, string Target), long>? usageCounts,
-        IReadOnlyCollection<ObservedGrainCall>? observedCalls = null)
+    private string GenerateMermaidDiagramInternal(IReadOnlyCollection<ObservedGrainCall>? observedCalls)
     {
         var sb = new StringBuilder();
         sb.AppendLine("graph LR");
 
-        var edges = observedCalls is null ? _grainGraph.GetAllEdges() : BuildDiagramEdges(observedCalls);
+        var nodes = new Dictionary<string, (string Id, string Label)>(StringComparer.Ordinal);
+        var assignedIds = new HashSet<string>(StringComparer.Ordinal);
+        var suffix = 1;
+        var edges = BuildDiagramEdges(observedCalls);
         foreach (var edge in edges.OrderBy(static e => e.Source, StringComparer.Ordinal).ThenBy(static e => e.Target, StringComparer.Ordinal))
         {
-            var arrow = GetArrowForEdge(edge, highlightedEdges);
-            var label = BuildEdgeLabel(edge.Transitions, usageCounts, edge.Source, edge.Target);
+            var arrow = GetArrowForEdge(edge);
+            var label = BuildMethodLabel(edge.Transitions);
+            var hasMethodLabel = !string.IsNullOrEmpty(label);
 
-            var sourceId = ToMermaidId(edge.Source);
-            var targetId = ToMermaidId(edge.Target);
+            var source = GetNode(edge.Source);
+            var target = GetNode(edge.Target);
 
             sb
                 .Append("    ")
-                .Append(sourceId)
+                .Append(source.Id)
                 .Append("[\"")
-                .Append(ToDisplayName(edge.Source))
+                .Append(source.Label)
                 .Append("\"] ")
                 .Append(arrow);
 
-            if (!string.IsNullOrEmpty(label))
+            if (hasMethodLabel || edge.Hits.HasValue)
             {
-                sb.Append('|').Append(label).Append('|');
+                sb.Append('|').Append(label);
+                if (edge.Hits is { } count)
+                {
+                    if (hasMethodLabel)
+                    {
+                        sb.Append("<br/>");
+                    }
+
+                    sb.Append(CultureInfo.CurrentCulture, $"hits: {count}");
+                }
+
+                sb.Append('|');
             }
 
             sb
                 .Append(' ')
-                .Append(targetId)
+                .Append(target.Id)
                 .Append("[\"")
-                .Append(ToDisplayName(edge.Target))
+                .Append(target.Label)
                 .AppendLine("\"]");
         }
 
         return sb.ToString();
+
+        (string Id, string Label) GetNode(string vertex)
+        {
+            if (nodes.TryGetValue(vertex, out var node))
+            {
+                return node;
+            }
+
+            var baseId = ToMermaidId(vertex);
+            var id = baseId;
+            while (!assignedIds.Add(id))
+            {
+                id = string.Create(CultureInfo.InvariantCulture, $"{baseId}_{++suffix}");
+            }
+
+            node = (id, ToDisplayName(vertex));
+            nodes.Add(vertex, node);
+            return node;
+        }
     }
 
-    private static string GetArrowForEdge((string Source, string Target, HashSet<GrainTransition> Transitions) edge, HashSet<(string Source, string Target)>? highlighted)
+    private static string GetArrowForEdge(DiagramEdge edge)
     {
-        var hasReentrant = edge.Transitions.Any(static t => t.IsReentrant);
-
-        if (highlighted is not null && highlighted.Contains((edge.Source, edge.Target)))
+        if (edge.IsObserved)
         {
             return "==>";
         }
 
-        return hasReentrant ? "-.->" : "-->";
+        foreach (var transition in edge.Transitions)
+        {
+            if (transition.IsReentrant)
+            {
+                return "-.->";
+            }
+        }
+
+        return "-->";
     }
 
-    private static string BuildEdgeLabel(IEnumerable<GrainTransition> transitions, Dictionary<(string Source, string Target), long>? usageCounts, string source, string target)
+    private static string BuildMethodLabel(HashSet<GrainTransition> transitions)
     {
-        var methods = transitions
-            .Select(static t => (Source: t.SourceMethod, Target: t.TargetMethod, t.IsReentrant))
-            .Distinct()
-            .Select(static entry =>
+        if (transitions.Count <= 1)
+        {
+            var items = transitions.GetEnumerator();
+            if (!items.MoveNext())
             {
-                if (entry.Source == Constants.AnyMethod && entry.Target == Constants.AnyMethod)
-                {
-                    return entry.IsReentrant ? "all (reentrant)" : "all";
-                }
+                return string.Empty;
+            }
 
-                if (entry.Source == Constants.AnyMethod)
-                {
-                    return entry.Target;
-                }
+            var item = items.Current;
+            return FormatMethodLabel((item.SourceMethod, item.TargetMethod, item.IsReentrant));
+        }
 
-                return entry.Source == entry.Target
-                    ? entry.Source
-                    : $"{entry.Source}->{entry.Target}";
-            })
+        var methods = transitions
+            .Select(static item => (item.SourceMethod, item.TargetMethod, item.IsReentrant))
+            .Distinct()
+            .Select(FormatMethodLabel)
             .OrderBy(static method => method, StringComparer.Ordinal)
             .ToArray();
-
-        var label = methods.Length switch
-        {
-            0 => string.Empty,
-            1 => methods[0],
-            _ => string.Join("<br/>", methods)
-        };
-
-        if (usageCounts is null)
-        {
-            return label;
-        }
-
-        if (!usageCounts.TryGetValue((source, target), out var count))
-        {
-            return label;
-        }
-
-        var usageSuffix = $"hits: {count}";
-        return string.IsNullOrEmpty(label) ? usageSuffix : $"{label}<br/>{usageSuffix}";
+        return string.Join("<br/>", methods);
     }
 
-    private IEnumerable<(string Source, string Target, HashSet<GrainTransition> Transitions)> BuildDiagramEdges(IReadOnlyCollection<ObservedGrainCall> observedCalls)
+    private static string FormatMethodLabel((string Source, string Target, bool IsReentrant) method)
     {
-        var edges = new Dictionary<(string Source, string Target), HashSet<GrainTransition>>();
-        foreach (var observedCall in observedCalls)
+        if (method.Source == Constants.AnyMethod && method.Target == Constants.AnyMethod)
         {
-            var key = (observedCall.Source, observedCall.Target);
-            ref var transitions = ref CollectionsMarshal.GetValueRefOrAddDefault(edges, key, out _);
-            transitions ??= new HashSet<GrainTransition>();
-            transitions.Add(new GrainTransition(observedCall.SourceMethod, observedCall.TargetMethod));
+            return method.IsReentrant ? "all (reentrant)" : "all";
         }
 
-        foreach (var edge in _grainGraph.GetAllEdges())
+        if (method.Source == Constants.AnyMethod)
         {
-            if (!edges.ContainsKey((edge.Source, edge.Target)))
+            return method.Target;
+        }
+
+        return method.Source == method.Target ? method.Source : $"{method.Source}->{method.Target}";
+    }
+
+    private IEnumerable<DiagramEdge> BuildDiagramEdges(IReadOnlyCollection<ObservedGrainCall>? observedCalls)
+    {
+        Dictionary<(string Source, string Target), (HashSet<GrainTransition> Transitions, long? Hits)>? observedEdges = null;
+        if (observedCalls is not null)
+        {
+            observedEdges = new();
+            foreach (var observedCall in observedCalls)
             {
-                yield return edge;
+                var key = (observedCall.Source, observedCall.Target);
+                ref var edge = ref CollectionsMarshal.GetValueRefOrAddDefault(observedEdges, key, out _);
+                edge.Transitions ??= new HashSet<GrainTransition>();
+                edge.Transitions.Add(new GrainTransition(observedCall.SourceMethod, observedCall.TargetMethod));
+                if (!string.IsNullOrWhiteSpace(key.Source) && !string.IsNullOrWhiteSpace(key.Target))
+                {
+                    edge.Hits = edge.Hits.GetValueOrDefault() + observedCall.Count;
+                }
             }
         }
 
-        foreach (var edge in edges)
+        foreach (var (source, target, transitions) in _grainGraph.GetAllEdges())
         {
-            yield return (edge.Key.Source, edge.Key.Target, edge.Value);
-        }
-    }
-
-    private static Dictionary<(string Source, string Target), long> BuildUsageCounts(IEnumerable<ObservedGrainCall> observedCalls)
-    {
-        var counts = observedCalls is IReadOnlyCollection<ObservedGrainCall> collection
-            ? new Dictionary<(string Source, string Target), long>(collection.Count)
-            : new Dictionary<(string Source, string Target), long>();
-
-        foreach (var edge in observedCalls)
-        {
-            if (string.IsNullOrWhiteSpace(edge.Source) || string.IsNullOrWhiteSpace(edge.Target))
+            if (observedEdges is null || !observedEdges.ContainsKey((source, target)))
             {
-                continue;
+                yield return new DiagramEdge(source, target, transitions);
             }
-
-            var key = (edge.Source, edge.Target);
-            ref var count = ref CollectionsMarshal.GetValueRefOrAddDefault(counts, key, out _);
-            count += edge.Count;
         }
 
-        return counts;
+        if (observedEdges is not null)
+        {
+            foreach (var (key, edge) in observedEdges)
+            {
+                yield return new DiagramEdge(key.Source, key.Target, edge.Transitions, IsObserved: true, Hits: edge.Hits);
+            }
+        }
     }
+
+    private readonly record struct DiagramEdge(
+        string Source, string Target, HashSet<GrainTransition> Transitions, bool IsObserved = false, long? Hits = null);
 
     private bool CheckTransitionAllowed(string source, string target, string sourceMethod, string targetMethod, bool throwOnViolation)
     {
@@ -780,13 +818,13 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
             $"Unable to resolve source method for outgoing call from {outCall.Caller} to {outCall.Interface}.{outCall.Method}.");
     }
 
-    private static void AddObservedEdge(Dictionary<ObservedGrainCallKey, ObservedGrainCall> edges, ObservedGrainCall edge)
+    private static void AddObservedEdge(Dictionary<ObservedGrainCallKey, ObservedGrainCall> edges, ObservedGrainCallKey key)
     {
-        var key = ObservedGrainCallKey.From(edge);
+        var now = DateTimeOffset.UtcNow;
         ref var existing = ref CollectionsMarshal.GetValueRefOrAddDefault(edges, key, out var exists);
         existing = exists
-            ? existing!.Merge(edge)
-            : edge;
+            ? existing!.Merge(1, now, now)
+            : new ObservedGrainCall(key.Source, key.Target, key.SourceMethod, key.TargetMethod, 1, now, now);
     }
 
     private static string GetObservedSource(Call call)
@@ -844,13 +882,14 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
 
     private static string ToMermaidId(string fullName)
     {
-        var sanitized = new StringBuilder(fullName.Length);
-        foreach (var ch in fullName)
+        return string.Create(fullName.Length, fullName, static (destination, name) =>
         {
-            sanitized.Append(char.IsLetterOrDigit(ch) ? ch : '_');
-        }
-
-        return sanitized.ToString();
+            for (var index = 0; index < destination.Length; index++)
+            {
+                var character = name[index];
+                destination[index] = char.IsLetterOrDigit(character) ? character : '_';
+            }
+        });
     }
 
     private static string ToDisplayName(string fullName)
@@ -863,29 +902,30 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
 
     private static bool CanReach(GrainId current, GrainId target, Dictionary<GrainId, List<GrainId>> graph, HashSet<GrainId> visited)
     {
-        if (current.Equals(target))
+        Stack<GrainId>? pending = null;
+        while (true)
         {
-            return true;
-        }
-
-        if (!visited.Add(current))
-        {
-            return false;
-        }
-
-        if (!graph.TryGetValue(current, out var neighbors))
-        {
-            return false;
-        }
-
-        foreach (var neighbor in neighbors)
-        {
-            if (CanReach(neighbor, target, graph, visited))
+            if (current.Equals(target))
             {
                 return true;
             }
-        }
 
-        return false;
+            if (visited.Add(current) && graph.TryGetValue(current, out var neighbors) && neighbors.Count > 0)
+            {
+                // Follow the first edge directly. Only branches need a worklist.
+                for (var index = neighbors.Count - 1; index > 0; index--)
+                {
+                    (pending ??= new Stack<GrainId>()).Push(neighbors[index]);
+                }
+
+                current = neighbors[0];
+                continue;
+            }
+
+            if (pending is null || !pending.TryPop(out current))
+            {
+                return false;
+            }
+        }
     }
 }

@@ -32,6 +32,7 @@ internal sealed class AsyncEnumerationFactoryCatalogBuilder
         .GetMethod(nameof(CreateFactory), BindingFlags.NonPublic | BindingFlags.Static)!;
     private readonly Dictionary<MethodInfo, Func<IInvokable, AsyncEnumerationScope, IInvokable>> _factories = [];
     private readonly Dictionary<Type, Func<IInvokable, AsyncEnumerationScope, IInvokable>> _factoriesByItemType = [];
+    private readonly HashSet<Type> _scannedContracts = [];
 
     public void AddGrainInterface(Type grainInterface)
     {
@@ -40,26 +41,40 @@ internal sealed class AsyncEnumerationFactoryCatalogBuilder
             return;
         }
 
-        foreach (var contract in grainInterface.GetInterfaces().Prepend(grainInterface))
+        var inheritedContracts = grainInterface.GetInterfaces();
+        RegisterContract(grainInterface);
+        foreach (var contract in inheritedContracts)
         {
-            foreach (var method in contract.GetMethods())
-            {
-                if (!TryGetItemType(method, out var itemType))
-                {
-                    continue;
-                }
-
-                if (!_factoriesByItemType.TryGetValue(itemType, out var factory))
-                {
-                    var createFactory = _createFactoryMethod.MakeGenericMethod(itemType);
-                    factory = (Func<IInvokable, AsyncEnumerationScope, IInvokable>)createFactory.CreateDelegate(
-                        typeof(Func<IInvokable, AsyncEnumerationScope, IInvokable>));
-                    _factoriesByItemType.Add(itemType, factory);
-                }
-
-                _factories.TryAdd(method, factory);
-            }
+            RegisterContract(contract);
         }
+    }
+
+    private void RegisterContract(Type contract)
+    {
+        if (_scannedContracts.Contains(contract))
+        {
+            return;
+        }
+
+        foreach (var method in contract.GetMethods())
+        {
+            if (!TryGetItemType(method, out var itemType))
+            {
+                continue;
+            }
+
+            if (!_factoriesByItemType.TryGetValue(itemType, out var factory))
+            {
+                var createFactory = _createFactoryMethod.MakeGenericMethod(itemType);
+                factory = (Func<IInvokable, AsyncEnumerationScope, IInvokable>)createFactory.CreateDelegate(
+                    typeof(Func<IInvokable, AsyncEnumerationScope, IInvokable>));
+                _factoriesByItemType.Add(itemType, factory);
+            }
+
+            _factories.TryAdd(method, factory);
+        }
+
+        _scannedContracts.Add(contract);
     }
 
     public AsyncEnumerationFactoryCatalog Build() => new(_factories);

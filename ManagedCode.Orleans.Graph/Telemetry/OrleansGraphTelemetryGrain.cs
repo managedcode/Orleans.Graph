@@ -27,8 +27,7 @@ public sealed class OrleansGraphTelemetryGrain : Grain, IOrleansGraphTelemetryGr
     {
         var snapshot = ObservedGrainCallAccumulator.CreateSnapshot(_observedCalls);
         DeactivateIfEmpty(snapshot);
-        var observedGraph = GrainTransitionManager.BuildObservedGraphFromSnapshot(snapshot);
-        return Task.FromResult(GrainTransitionManager.GenerateObservedGraphMermaidDiagram(observedGraph));
+        return Task.FromResult(GrainTransitionManager.GenerateObservedCallsMermaidDiagram(snapshot));
     }
 
     public Task ClearAsync()

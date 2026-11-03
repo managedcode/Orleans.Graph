@@ -36,6 +36,11 @@ internal struct ObservedGrainCallAccumulator(ObservedGrainCall observedCall)
 
     public static ObservedGrainCall[] CreateSnapshot(Dictionary<ObservedGrainCallKey, ObservedGrainCallAccumulator> calls)
     {
+        if (calls.Count == 0)
+        {
+            return Array.Empty<ObservedGrainCall>();
+        }
+
         var snapshot = new ObservedGrainCall[calls.Count];
         var index = 0;
         foreach (var (key, accumulator) in calls)

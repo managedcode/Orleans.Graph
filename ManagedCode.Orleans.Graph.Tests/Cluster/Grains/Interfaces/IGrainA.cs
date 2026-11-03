@@ -4,6 +4,8 @@ public interface IGrainA : IGrainWithStringKey
 {
     Task<int> MethodA1(int input);
 
+    Task<string> CallPeerAsync(string peerKey, int remainingHops);
+
     Task<int> MethodB1(int input);
     Task<int> MethodB2(int input);
 
@@ -11,7 +13,7 @@ public interface IGrainA : IGrainWithStringKey
 
     Task<int> MethodComplexFlow(int input);
 
-    Task<int> MethodGrainOnlyComplexFlow(int input);
+    Task<int> MethodGrainOnlyComplexFlow(int input, DateTimeOffset startedAt);
 
     Task<int[]> ObserveParallelCallHistoryAsync(int calls);
 

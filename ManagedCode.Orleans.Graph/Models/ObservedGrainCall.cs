@@ -28,11 +28,16 @@ public sealed record ObservedGrainCall(
             throw new InvalidOperationException("Observed grain calls must share the same identity to be merged.");
         }
 
+        return Merge(call.Count, call.FirstSeenUtc, call.LastSeenUtc);
+    }
+
+    internal ObservedGrainCall Merge(long count, DateTimeOffset firstSeenUtc, DateTimeOffset lastSeenUtc)
+    {
         return this with
         {
-            Count = Count + call.Count,
-            FirstSeenUtc = FirstSeenUtc <= call.FirstSeenUtc ? FirstSeenUtc : call.FirstSeenUtc,
-            LastSeenUtc = LastSeenUtc >= call.LastSeenUtc ? LastSeenUtc : call.LastSeenUtc
+            Count = Count + count,
+            FirstSeenUtc = FirstSeenUtc <= firstSeenUtc ? FirstSeenUtc : firstSeenUtc,
+            LastSeenUtc = LastSeenUtc >= lastSeenUtc ? LastSeenUtc : lastSeenUtc
         };
     }
 }

@@ -76,43 +76,21 @@ public class GrainCallsBuilder(bool allowSelfLoops = true) : IGrainCallsBuilder
 
     internal void AddTransition(string source, string target)
     {
-        _graph.AddTransition(source, target, new GrainTransition(Constants.AnyMethod, Constants.AnyMethod));
+        _graph.AddTransitionToAcyclicGraph(source, target, new GrainTransition(Constants.AnyMethod, Constants.AnyMethod));
     }
 
     internal void AddMethodRule(string source, string target, string sourceMethod, string targetMethod)
     {
-        _graph.AddTransition(source, target, new GrainTransition(sourceMethod, targetMethod));
+        _graph.AddTransitionToAcyclicGraph(source, target, new GrainTransition(sourceMethod, targetMethod));
     }
 
     internal void AddReentrancy(string source, string target)
     {
-        _graph.AddTransition(source, target, new GrainTransition(Constants.AnyMethod, Constants.AnyMethod, IsReentrant: true));
+        _graph.AddTransitionToAcyclicGraph(source, target, new GrainTransition(Constants.AnyMethod, Constants.AnyMethod, IsReentrant: true));
     }
 
-    public GrainTransitionManager Build()
-    {
-        ValidateCycles();
-        return new GrainTransitionManager(_graph, _allowAllByDefault);
-    }
-
-    private void ValidateCycles()
-    {
-        foreach (var edge in _graph.GetAllEdges())
-        {
-            foreach (var transition in edge.Transitions)
-            {
-                if (transition.IsReentrant)
-                {
-                    continue;
-                }
-
-                if (_graph.HasCycle())
-                {
-                    throw new InvalidOperationException($"Cycle detected involving grain {edge.Source}");
-                }
-            }
-        }
-    }
+    // DirectedGraph validates blocking edges as they are added.
+    public GrainTransitionManager Build() => new(_graph, _allowAllByDefault);
 
     public static IGrainCallsBuilder Create(bool allowSelfLoops = true)
     {

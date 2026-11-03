@@ -1,4 +1,5 @@
 using ManagedCode.Orleans.Graph.Interfaces;
+using ManagedCode.Orleans.Graph.Models;
 using ManagedCode.Orleans.Graph.Tests.Cluster.Grains.Interfaces;
 
 namespace ManagedCode.Orleans.Graph.Tests.Cluster.Grains;
@@ -21,6 +22,18 @@ public class GrainA : Grain, IGrainA, IRemindable
     public async Task<int> MethodA1(int input)
     {
         return await Task.FromResult(input + 1);
+    }
+
+    public async Task<string> CallPeerAsync(string peerKey, int remainingHops)
+    {
+        var currentKey = this.GetPrimaryKeyString();
+        if (remainingHops == 0)
+        {
+            return currentKey;
+        }
+
+        using var suppression = RequestContext.SuppressCallChainReentrancy();
+        return await GrainFactory.GetGrain<IGrainA>(peerKey).CallPeerAsync(currentKey, remainingHops - 1);
     }
 
     public async Task<int> MethodB1(int input)
@@ -46,9 +59,9 @@ public class GrainA : Grain, IGrainA, IRemindable
         return await RunBranchingFlowAsync(input);
     }
 
-    public async Task<int> MethodGrainOnlyComplexFlow(int input)
+    public async Task<int> MethodGrainOnlyComplexFlow(int input, DateTimeOffset startedAt)
     {
-        await ClearRuntimeGraphTelemetryAsync();
+        await ClearRuntimeGraphTelemetryAsync(startedAt);
 
         return await RunBranchingFlowAsync(input);
     }
@@ -185,10 +198,29 @@ public class GrainA : Grain, IGrainA, IRemindable
         }
     }
 
-    private async Task ClearRuntimeGraphTelemetryAsync()
+    private async Task ClearRuntimeGraphTelemetryAsync(DateTimeOffset startedAt)
     {
-        await Task.Delay(100);
-        await GrainFactory.GetGrain<IOrleansGraphTelemetryWorker>(Constants.LiveGraphTelemetryGrainKey).FlushAsync();
-        await GrainFactory.GetGrain<IOrleansGraphTelemetryGrain>(Constants.LiveGraphTelemetryGrainKey).ClearAsync();
+        var telemetry = GrainFactory.GetGrain<IOrleansGraphTelemetryGrain>(Constants.LiveGraphTelemetryGrainKey);
+        if (RequestContext.Get(Constants.RequestContextKey) is CallHistory history &&
+            GrainTransitionManager.GetLatestObservedCall(history) is { } incomingCall)
+        {
+            // Wait for the silo-local worker to publish the entry edge before clearing it.
+            var key = ObservedGrainCallKey.From(incomingCall);
+            for (var attempt = 0; attempt < 100; attempt++)
+            {
+                var graph = await telemetry.GetObservedGraphAsync();
+                if (graph.Edges.Any(edge => edge.LastSeenUtc >= startedAt && ObservedGrainCallKey.From(edge) == key))
+                {
+                    await telemetry.ClearAsync();
+                    return;
+                }
+
+                await Task.Delay(50);
+            }
+
+            throw new InvalidOperationException($"Entry edge {key} was not published before the grain-only flow.");
+        }
+
+        await telemetry.ClearAsync();
     }
 }

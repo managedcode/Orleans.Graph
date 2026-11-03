@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using Orleans.Concurrency;
 using Orleans.Serialization.Invocation;
 
@@ -7,14 +7,14 @@ namespace ManagedCode.Orleans.Graph.Extensions;
 
 internal static class MayInterleavePredicateCache
 {
-    private static readonly ConcurrentDictionary<Type, Lazy<Func<object, IInvokable, bool>>> _predicates = new();
+    private static readonly ConditionalWeakTable<Type, Lazy<Func<object, IInvokable, bool>>> _predicates = new();
 
     public static bool Allows(object grain, IInvokable request)
     {
         ArgumentNullException.ThrowIfNull(grain);
         ArgumentNullException.ThrowIfNull(request);
 
-        return _predicates.GetOrAdd(
+        return _predicates.GetValue(
                 grain.GetType(),
                 static grainType => new Lazy<Func<object, IInvokable, bool>>(
                     () => CreatePredicate(grainType),

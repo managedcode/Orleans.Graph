@@ -226,7 +226,7 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
 
         var result = await _fixture.Cluster.Client
             .GetGrain<IGrainA>("grain-only-complex-flow")
-            .MethodGrainOnlyComplexFlow(1);
+            .MethodGrainOnlyComplexFlow(1, DateTimeOffset.UtcNow);
 
         result.ShouldBe(5);
 
@@ -253,7 +253,7 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
 
         var result = await grainFactory
             .GetGrain<IGrainA>("grain-factory-complex-flow")
-            .MethodGrainOnlyComplexFlow(1);
+            .MethodGrainOnlyComplexFlow(1, DateTimeOffset.UtcNow);
 
         result.ShouldBe(5);
 
@@ -564,7 +564,7 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
         IReadOnlyCollection<ObservedGrainCall> edges,
         IReadOnlyCollection<ExpectedObservedCall> expectedEdges)
     {
-        edges.Count.ShouldBe(expectedEdges.Count);
+        edges.Count.ShouldBe(expectedEdges.Count, FormatObservedEdges(edges));
 
         foreach (var expected in expectedEdges)
         {

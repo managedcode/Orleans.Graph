@@ -1,6 +1,7 @@
 using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
 using ManagedCode.Orleans.Graph.Tests.Cluster.Grains.Interfaces;
+using Orleans.CodeGeneration;
 
 namespace ManagedCode.Orleans.Graph.Tests;
 
@@ -449,6 +450,21 @@ public class GrainTransitionManagerTests
     }
 
     [Test]
+    public void Builder_RejectsBlockingRuleOnReentrantEdgeWhenItClosesCycle()
+    {
+        var builder = new GrainCallsBuilder();
+        var edge = builder.AddGrainTransition<IGrainA, IGrainB>().WithReentrancy();
+        builder.AddGrainTransition<IGrainB, IGrainA>().AllMethods();
+
+        Should.Throw<InvalidOperationException>(edge.AllMethods);
+
+        var policy = builder.Build().GetPolicyEdges();
+        policy.Count.ShouldBe(2);
+        policy.Single(item => item.Source == typeof(IGrainA).FullName).Transitions
+            .Single().IsReentrant.ShouldBeTrue();
+    }
+
+    [Test]
     public void Build_AllowsCycleWhenOneEdgeIsReentrant()
     {
         var graph = GrainCallsBuilder.Create()
@@ -535,6 +551,55 @@ public class GrainTransitionManagerTests
         callHistory.Push(new InCall(grainId, grainId, typeof(IGrainA).FullName!, nameof(IGrainA.MethodA1)));
 
         graph.DetectDeadlocks(callHistory).ShouldBeFalse();
+    }
+
+    [Test]
+    public void DeadlockChecks_IgnoreEarlierOneWayEdge()
+    {
+        var manager = new GrainTransitionManager(new DirectedGraph());
+        var source = GrainId.Create("one-way", "source");
+        var target = GrainId.Create("one-way", "target");
+        var outgoing = new OutCall(source, target, nameof(IGrainA), nameof(IGrainB), nameof(IGrainB.MethodB1), nameof(IGrainA.MethodB1))
+        {
+            InvocationOptions = InvokeMethodOptions.OneWay
+        };
+        var history = new CallHistory();
+        history.Push(outgoing);
+        history.Push(new OutCall(target, source, nameof(IGrainB), nameof(IGrainA), nameof(IGrainA.MethodB1), nameof(IGrainB.MethodB1)));
+
+        manager.DetectLatestDeadlock(history).ShouldBeFalse();
+        manager.DetectDeadlocks(history).ShouldBeFalse();
+
+        outgoing.InvocationOptions = InvokeMethodOptions.None;
+        manager.DetectLatestDeadlock(history).ShouldBeTrue();
+        manager.DetectDeadlocks(history).ShouldBeTrue();
+    }
+
+    [Test]
+    public void DeadlockChecks_HandleDeepCallHistory()
+    {
+        const int Depth = 100_000;
+        var manager = new GrainTransitionManager(new DirectedGraph());
+        var first = GrainId.Create("deep-history", "first");
+        var previous = first;
+        var history = new CallHistory();
+        for (var index = 0; index < Depth; index++)
+        {
+            var next = GrainId.Create("deep-history", index.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            history.Push(new OutCall(previous, next, nameof(IGrainA), nameof(IGrainB), nameof(IGrainB.MethodB1), nameof(IGrainA.MethodB1)));
+            previous = next;
+        }
+
+        var unrelated = GrainId.Create("deep-history", "unrelated");
+        history.Push(new OutCall(first, unrelated, nameof(IGrainA), nameof(IGrainB), nameof(IGrainB.MethodB1), nameof(IGrainA.MethodB1)));
+
+        manager.DetectDeadlocks(history).ShouldBeFalse();
+        manager.DetectLatestDeadlock(history).ShouldBeFalse();
+
+        history.Push(new OutCall(previous, first, nameof(IGrainB), nameof(IGrainA), nameof(IGrainA.MethodB1), nameof(IGrainB.MethodB1)));
+
+        manager.DetectDeadlocks(history).ShouldBeTrue();
+        manager.DetectLatestDeadlock(history).ShouldBeTrue();
     }
 
     [Test]
@@ -760,6 +825,27 @@ public class GrainTransitionManagerTests
         diagram.ShouldContain($"{nameof(IGrainA.MethodA1)}->{nameof(IGrainB.MethodB1)}");
         diagram.ShouldContain($"{nameof(IGrainA.MethodB1)}->{nameof(IGrainB.MethodC2)}");
         diagram.ShouldContain("hits: 2");
+    }
+
+    [Test]
+    public void GenerateObservedGraphMermaidDiagram_SeparatesCollidingVertexIds()
+    {
+        const string First = "Demo.Worker";
+        const string Second = "Demo_Worker";
+        const string Third = "Demo_Worker_2";
+        const string Method = "Run";
+        var graph = GrainTransitionManager.BuildObservedGraph(
+        [
+            ObservedGrainCall.Create(First, Second, Method, Method),
+            ObservedGrainCall.Create(Second, Third, Method, Method),
+            ObservedGrainCall.Create(Third, First, Method, Method)
+        ]);
+
+        var diagram = GrainTransitionManager.GenerateObservedGraphMermaidDiagram(graph);
+
+        diagram.ShouldContain("Demo_Worker[\"Worker\"] ==>|Run<br/>hits: 1| Demo_Worker_2[\"Demo_Worker\"]");
+        diagram.ShouldContain("Demo_Worker_2[\"Demo_Worker\"] ==>|Run<br/>hits: 1| Demo_Worker_2_3[\"Demo_Worker_2\"]");
+        diagram.ShouldContain("Demo_Worker_2_3[\"Demo_Worker_2\"] ==>|Run<br/>hits: 1| Demo_Worker[\"Worker\"]");
     }
 
     [Test]

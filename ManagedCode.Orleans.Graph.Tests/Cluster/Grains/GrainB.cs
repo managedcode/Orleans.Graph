@@ -32,5 +32,8 @@ public class GrainB : Grain, IGrainB
         return Task.CompletedTask;
     }
 
+    public Task DispatchOneWayToSelfAsync() =>
+        GrainFactory.GetGrain<IGrainB>(this.GetPrimaryKeyString()).RecordOneWayHistoryDepthAsync();
+
     public Task<int?> GetOneWayHistoryDepthAsync() => Task.FromResult(_oneWayHistoryDepth);
 }

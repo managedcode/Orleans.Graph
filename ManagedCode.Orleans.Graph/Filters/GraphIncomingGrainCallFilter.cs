@@ -106,6 +106,11 @@ public class GraphIncomingGrainCallFilter(IServiceProvider serviceProvider, Grap
         }
 
         // The async method scopes RequestContext changes to this telemetry call.
+        if (!graphCallFilterConfig.TrackOrleansGraphInternalCalls)
+        {
+            RequestContext.Remove(Constants.RequestContextKey);
+        }
+
         RequestContext.Set(Constants.TelemetrySuppressionContextKey, true);
         await _grainFactory
             .GetGrain<IOrleansGraphTelemetryWorker>(Constants.LiveGraphTelemetryGrainKey)

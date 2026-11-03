@@ -71,6 +71,20 @@ public static class GraphCallChainReentrancyExtensions
             return branch;
         }
 
+        if (history.NativeCallChainScopes is [var existingScope])
+        {
+            if (existingScope.ReentrancyId != reentrancyId)
+            {
+                branch.NativeCallChainScopes[0] = new NativeCallChainScope(actorId, reentrancyId);
+                return branch;
+            }
+
+            if (existingScope.ActorId.Equals(actorId))
+            {
+                return branch;
+            }
+        }
+
         var participants = new HashSet<GrainId> { actorId };
         foreach (var call in history.History)
         {
