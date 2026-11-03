@@ -28,9 +28,11 @@ public class CallHistory
         if (!detach)
         {
             branch.NativeCallChainScopes = [.. NativeCallChainScopes];
-            foreach (var call in History.Reverse())
+            var calls = History.ToArray();
+            branch.History.EnsureCapacity(calls.Length);
+            for (var index = calls.Length - 1; index >= 0; index--)
             {
-                branch.Push(call);
+                branch.Push(calls[index]);
             }
         }
 

@@ -64,6 +64,13 @@ public static class GraphCallChainReentrancyExtensions
 
     private static CallHistory RegisterScope(CallHistory history, GrainId actorId, Guid reentrancyId)
     {
+        var branch = history.Fork();
+        if (history.NativeCallChainScopes.Length == 0)
+        {
+            branch.NativeCallChainScopes = [new NativeCallChainScope(actorId, reentrancyId)];
+            return branch;
+        }
+
         var participants = new HashSet<GrainId> { actorId };
         foreach (var call in history.History)
         {
@@ -92,7 +99,6 @@ public static class GraphCallChainReentrancyExtensions
             scopes.Add(new NativeCallChainScope(actorId, reentrancyId));
         }
 
-        var branch = history.Fork();
         branch.NativeCallChainScopes = [.. scopes];
         return branch;
     }

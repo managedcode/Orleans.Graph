@@ -4,7 +4,7 @@ using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
 using ManagedCode.Orleans.Graph.Telemetry;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Concurrency;
+using Orleans.CodeGeneration;
 using Orleans.Serialization.Invocation;
 
 namespace ManagedCode.Orleans.Graph.Filters;
@@ -18,11 +18,11 @@ public class GraphIncomingGrainCallFilter(IServiceProvider serviceProvider, Grap
     public async Task Invoke(IIncomingGrainCallContext context)
     {
         var currentCaller = RequestContextHelper.CaptureCurrentCaller();
-        var isEnumerationStart = AsyncEnumerationRequestAdapter.TryGetOriginal(context.Request, out var originalRequest);
-        var tracked = context.TrackIncomingCall(graphCallFilterConfig);
-        var previousHistory = RequestContext.Get(Constants.RequestContextKey);
-        var detachOneWay = context.InterfaceMethod.IsDefined(typeof(OneWayAttribute), inherit: true) &&
-                           previousHistory is CallHistory;
+        AsyncEnumerationRequestAdapter.TryGetOriginal(context.Request, out var originalRequest);
+        var tracked = context.TrackIncomingCall(graphCallFilterConfig, originalRequest);
+        var previousHistory = context.Request is IRequest request && (request.Options & InvokeMethodOptions.OneWay) != 0
+            ? RequestContext.Get(Constants.RequestContextKey) as CallHistory
+            : null;
 
         try
         {
@@ -30,31 +30,32 @@ public class GraphIncomingGrainCallFilter(IServiceProvider serviceProvider, Grap
             {
                 var callHistory = context.GetCallHistory();
 
-                if (!context.IsOrleansGraphTelemetryCall())
+                var isTelemetryCall = RequestContextHelper.IsOrleansGraphTelemetryRequest(originalRequest ?? context.Request);
+                if (!isTelemetryCall)
                 {
                     _graphManager?.IsLatestTransitionAllowed(callHistory, true);
                 }
 
-                await ReportObservedEdgeAsync(context, callHistory);
+                await ReportObservedEdgeAsync(context, callHistory, isTelemetryCall);
             }
 
-            if (isEnumerationStart && tracked)
+            if (originalRequest is not null && tracked)
             {
                 WrapEnumerationRequest(context, originalRequest);
             }
 
-            if (detachOneWay)
+            if (previousHistory is not null)
             {
-                RequestContext.Set(Constants.RequestContextKey, ((CallHistory)previousHistory!).Fork(detach: true));
+                RequestContext.Set(Constants.RequestContextKey, previousHistory.Fork(detach: true));
             }
 
             await context.Invoke();
         }
         finally
         {
-            if (detachOneWay)
+            if (previousHistory is not null)
             {
-                RequestContext.Set(Constants.RequestContextKey, previousHistory!);
+                RequestContext.Set(Constants.RequestContextKey, previousHistory);
             }
 
             if (tracked)
@@ -75,7 +76,7 @@ public class GraphIncomingGrainCallFilter(IServiceProvider serviceProvider, Grap
         context.Request.SetArgument(1, _enumerationCatalog.Wrap(originalRequest, scope));
     }
 
-    private async Task ReportObservedEdgeAsync(IIncomingGrainCallContext context, CallHistory callHistory)
+    private async Task ReportObservedEdgeAsync(IIncomingGrainCallContext context, CallHistory callHistory, bool isTelemetryCall)
     {
         if (!graphCallFilterConfig.EnableLiveGraphTelemetry)
         {
@@ -88,7 +89,7 @@ public class GraphIncomingGrainCallFilter(IServiceProvider serviceProvider, Grap
             return;
         }
 
-        if (context.Grain is IObservedGrainCallSink sink && context.IsOrleansGraphTelemetryCall())
+        if (isTelemetryCall && context.Grain is IObservedGrainCallSink sink)
         {
             sink.RecordObservedCall(observedCall);
             return;
@@ -104,9 +105,10 @@ public class GraphIncomingGrainCallFilter(IServiceProvider serviceProvider, Grap
             return;
         }
 
-        await RequestContextHelper.RunWithTelemetrySuppressedAsync(() =>
-            _grainFactory
-                .GetGrain<IOrleansGraphTelemetryWorker>(Constants.LiveGraphTelemetryGrainKey)
-                .RecordObservedCallAsync(observedCall));
+        // The async method scopes RequestContext changes to this telemetry call.
+        RequestContext.Set(Constants.TelemetrySuppressionContextKey, true);
+        await _grainFactory
+            .GetGrain<IOrleansGraphTelemetryWorker>(Constants.LiveGraphTelemetryGrainKey)
+            .RecordObservedCallAsync(observedCall);
     }
 }

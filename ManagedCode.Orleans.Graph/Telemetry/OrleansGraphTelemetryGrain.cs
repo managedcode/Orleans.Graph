@@ -18,14 +18,14 @@ public sealed class OrleansGraphTelemetryGrain : Grain, IOrleansGraphTelemetryGr
 
     public Task<ObservedGrainCallGraph> GetObservedGraphAsync()
     {
-        var snapshot = CreateSnapshot();
+        var snapshot = ObservedGrainCallAccumulator.CreateSnapshot(_observedCalls);
         DeactivateIfEmpty(snapshot);
         return Task.FromResult(GrainTransitionManager.BuildObservedGraphFromSnapshot(snapshot));
     }
 
     public Task<string> GenerateLiveMermaidDiagramAsync()
     {
-        var snapshot = CreateSnapshot();
+        var snapshot = ObservedGrainCallAccumulator.CreateSnapshot(_observedCalls);
         DeactivateIfEmpty(snapshot);
         var observedGraph = GrainTransitionManager.BuildObservedGraphFromSnapshot(snapshot);
         return Task.FromResult(GrainTransitionManager.GenerateObservedGraphMermaidDiagram(observedGraph));
@@ -65,17 +65,5 @@ public sealed class OrleansGraphTelemetryGrain : Grain, IOrleansGraphTelemetryGr
         }
 
         accumulator = new ObservedGrainCallAccumulator(observedCall);
-    }
-
-    private ObservedGrainCall[] CreateSnapshot()
-    {
-        var snapshot = new ObservedGrainCall[_observedCalls.Count];
-        var index = 0;
-        foreach (var accumulator in _observedCalls.Values)
-        {
-            snapshot[index++] = accumulator.ToObservedGrainCall();
-        }
-
-        return snapshot;
     }
 }

@@ -86,7 +86,7 @@ public sealed class OrleansGraphTelemetryWorker(
             return;
         }
 
-        var snapshot = CreateSnapshot();
+        var snapshot = ObservedGrainCallAccumulator.CreateSnapshot(_observedCalls);
         _observedCalls.Clear();
 
         try
@@ -125,18 +125,6 @@ public sealed class OrleansGraphTelemetryWorker(
         }
 
         accumulator = new ObservedGrainCallAccumulator(observedCall);
-    }
-
-    private ObservedGrainCall[] CreateSnapshot()
-    {
-        var snapshot = new ObservedGrainCall[_observedCalls.Count];
-        var index = 0;
-        foreach (var accumulator in _observedCalls.Values)
-        {
-            snapshot[index++] = accumulator.ToObservedGrainCall();
-        }
-
-        return snapshot;
     }
 
     private Task FlushTimerAsync(CancellationToken cancellationToken)

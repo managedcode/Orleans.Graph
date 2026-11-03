@@ -27,8 +27,8 @@ public class GraphOutgoingGrainCallFilter(IServiceProvider serviceProvider, Grap
 
         try
         {
-            if (context.TrackOutgoingCall(graphCallFilterConfig) &&
-                !context.IsOrleansGraphTelemetryCall())
+            if (context.TrackOutgoingCall(graphCallFilterConfig, originalRequest) &&
+                !RequestContextHelper.IsOrleansGraphTelemetryRequest(originalRequest ?? context.Request))
             {
                 var callHistory = context.GetCallHistory();
                 _graphManager?.DetectLatestDeadlock(callHistory, true);

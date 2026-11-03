@@ -4,10 +4,6 @@ namespace ManagedCode.Orleans.Graph.Telemetry;
 
 internal struct ObservedGrainCallAccumulator(ObservedGrainCall observedCall)
 {
-    private readonly string _source = observedCall.Source;
-    private readonly string _target = observedCall.Target;
-    private readonly string _sourceMethod = observedCall.SourceMethod;
-    private readonly string _targetMethod = observedCall.TargetMethod;
     private long _count = observedCall.Count;
     private DateTimeOffset _firstSeenUtc = observedCall.FirstSeenUtc;
     private DateTimeOffset _lastSeenUtc = observedCall.LastSeenUtc;
@@ -26,15 +22,27 @@ internal struct ObservedGrainCallAccumulator(ObservedGrainCall observedCall)
         }
     }
 
-    public readonly ObservedGrainCall ToObservedGrainCall()
+    private readonly ObservedGrainCall ToObservedGrainCall(ObservedGrainCallKey key)
     {
         return new ObservedGrainCall(
-            _source,
-            _target,
-            _sourceMethod,
-            _targetMethod,
+            key.Source,
+            key.Target,
+            key.SourceMethod,
+            key.TargetMethod,
             _count,
             _firstSeenUtc,
             _lastSeenUtc);
+    }
+
+    public static ObservedGrainCall[] CreateSnapshot(Dictionary<ObservedGrainCallKey, ObservedGrainCallAccumulator> calls)
+    {
+        var snapshot = new ObservedGrainCall[calls.Count];
+        var index = 0;
+        foreach (var (key, accumulator) in calls)
+        {
+            snapshot[index++] = accumulator.ToObservedGrainCall(key);
+        }
+
+        return snapshot;
     }
 }

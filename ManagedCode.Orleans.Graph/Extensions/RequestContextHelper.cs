@@ -1,3 +1,5 @@
+using System.Reflection;
+using System.Runtime.CompilerServices;
 using ManagedCode.Orleans.Graph.Features.AsyncEnumeration;
 using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
@@ -8,6 +10,8 @@ namespace ManagedCode.Orleans.Graph.Extensions;
 
 public static class RequestContextHelper
 {
+    private static readonly ConditionalWeakTable<Module, string> _moduleNames = new();
+
     public static bool TrackIncomingCall(this IIncomingGrainCallContext context)
     {
         var request = AsyncEnumerationRequestAdapter.GetPolicyRequest(context.Request);
@@ -42,10 +46,15 @@ public static class RequestContextHelper
 
     public static bool TrackIncomingCall(this IIncomingGrainCallContext context, GraphCallFilterConfig graphCallFilterConfig)
     {
-        var hasOriginalStream = AsyncEnumerationRequestAdapter.TryGetOriginal(context.Request, out var originalRequest);
-        var request = hasOriginalStream ? originalRequest : context.Request;
-        var moduleName = hasOriginalStream ? request.GetMethod().Module.Name : context.ImplementationMethod.Module.Name;
-        if (context.ShouldSkipTracking(graphCallFilterConfig, moduleName))
+        AsyncEnumerationRequestAdapter.TryGetOriginal(context.Request, out var originalRequest);
+        return context.TrackIncomingCall(graphCallFilterConfig, originalRequest);
+    }
+
+    internal static bool TrackIncomingCall(this IIncomingGrainCallContext context, GraphCallFilterConfig graphCallFilterConfig, IInvokable? originalRequest)
+    {
+        var request = originalRequest ?? context.Request;
+        var module = originalRequest is null ? context.ImplementationMethod.Module : originalRequest.GetMethod().Module;
+        if (context.ShouldSkipTracking(graphCallFilterConfig, module, request))
         {
             return false;
         }
@@ -58,10 +67,15 @@ public static class RequestContextHelper
 
     public static bool TrackOutgoingCall(this IOutgoingGrainCallContext context, GraphCallFilterConfig graphCallFilterConfig)
     {
-        var hasOriginalStream = AsyncEnumerationRequestAdapter.TryGetOriginal(context.Request, out var originalRequest);
-        var request = hasOriginalStream ? originalRequest : context.Request;
-        var moduleName = hasOriginalStream ? request.GetMethod().Module.Name : context.InterfaceMethod.Module.Name;
-        if (context.ShouldSkipTracking(graphCallFilterConfig, moduleName))
+        AsyncEnumerationRequestAdapter.TryGetOriginal(context.Request, out var originalRequest);
+        return context.TrackOutgoingCall(graphCallFilterConfig, originalRequest);
+    }
+
+    internal static bool TrackOutgoingCall(this IOutgoingGrainCallContext context, GraphCallFilterConfig graphCallFilterConfig, IInvokable? originalRequest)
+    {
+        var request = originalRequest ?? context.Request;
+        var module = originalRequest is null ? context.InterfaceMethod.Module : originalRequest.GetMethod().Module;
+        if (context.ShouldSkipTracking(graphCallFilterConfig, module, request))
         {
             return false;
         }
@@ -124,9 +138,13 @@ public static class RequestContextHelper
 
     public static bool IsOrleansGraphTelemetryCall(this IGrainCallContext context)
     {
-        var request = AsyncEnumerationRequestAdapter.GetPolicyRequest(context.Request);
-        return string.Equals(request.GetInterfaceName(), typeof(IOrleansGraphTelemetryWorker).FullName, StringComparison.Ordinal) ||
-               string.Equals(request.GetInterfaceName(), typeof(IOrleansGraphTelemetryGrain).FullName, StringComparison.Ordinal);
+        return IsOrleansGraphTelemetryRequest(AsyncEnumerationRequestAdapter.GetPolicyRequest(context.Request));
+    }
+
+    internal static bool IsOrleansGraphTelemetryRequest(IInvokable request)
+    {
+        var interfaceType = request.GetInterfaceType();
+        return interfaceType == typeof(IOrleansGraphTelemetryWorker) || interfaceType == typeof(IOrleansGraphTelemetryGrain);
     }
 
     public static bool IsTelemetrySuppressed()
@@ -190,17 +208,17 @@ public static class RequestContextHelper
         }
     }
 
-    private static bool ShouldSkipTracking(this IGrainCallContext context, GraphCallFilterConfig graphCallFilterConfig, string moduleName)
+    private static bool ShouldSkipTracking(this IGrainCallContext context, GraphCallFilterConfig graphCallFilterConfig, Module module, IInvokable request)
     {
         if (!graphCallFilterConfig.TrackOrleansCalls &&
             (context.TargetId.IsSystemTarget() ||
-             (moduleName.StartsWith("Orleans.", StringComparison.Ordinal) &&
+             (_moduleNames.GetValue(module, static key => key.Name).StartsWith("Orleans.", StringComparison.Ordinal) &&
               !IsActivationCallbackCaller(context.Request.GetInterfaceName()))))
         {
             return true;
         }
 
-        if (!graphCallFilterConfig.TrackOrleansGraphInternalCalls && context.IsOrleansGraphTelemetryCall())
+        if (!graphCallFilterConfig.TrackOrleansGraphInternalCalls && IsOrleansGraphTelemetryRequest(request))
         {
             return true;
         }

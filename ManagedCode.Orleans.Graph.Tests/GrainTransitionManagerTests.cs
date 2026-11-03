@@ -572,6 +572,7 @@ public class GrainTransitionManagerTests
             nameof(IGrainC.MethodC1)));
 
         graph.DetectLatestDeadlock(callHistory).ShouldBeTrue();
+        graph.DetectDeadlocks(callHistory).ShouldBeTrue();
     }
 
     [Test]
@@ -602,6 +603,7 @@ public class GrainTransitionManagerTests
             nameof(IGrainB.MethodB1)));
 
         graph.DetectLatestDeadlock(callHistory).ShouldBeFalse();
+        graph.DetectDeadlocks(callHistory).ShouldBeFalse();
     }
 
     [Test]

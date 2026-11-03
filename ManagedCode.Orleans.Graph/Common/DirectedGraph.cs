@@ -34,7 +34,10 @@ public class DirectedGraph(bool allowSelfLoops = false)
             transitions = new HashSet<GrainTransition>();
         }
 
-        transitions.Add(transition);
+        if (!transitions.Add(transition))
+        {
+            return;
+        }
 
         if (!transition.IsReentrant && HasCycle())
         {

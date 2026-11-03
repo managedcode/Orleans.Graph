@@ -6,6 +6,8 @@ namespace ManagedCode.Orleans.Graph.Features.AsyncEnumeration;
 
 internal sealed class AsyncEnumerationScope(CurrentCallerContext caller, CallHistory history)
 {
+    private readonly object _caller = caller;
+
     public static AsyncEnumerationScope Capture()
     {
         if (RequestContextHelper.CaptureCurrentCaller() is not CurrentCallerContext caller ||
@@ -17,16 +19,16 @@ internal sealed class AsyncEnumerationScope(CurrentCallerContext caller, CallHis
         return new AsyncEnumerationScope(caller, history.Fork());
     }
 
-    public IDisposable Enter()
+    public RestoreRequestContext Enter()
     {
         var previousCaller = RequestContextHelper.CaptureCurrentCaller();
         var previousHistory = RequestContext.Get(Constants.RequestContextKey);
-        RequestContext.Set(Constants.CurrentCallerContextKey, caller);
+        RequestContext.Set(Constants.CurrentCallerContextKey, _caller);
         RequestContext.Set(Constants.RequestContextKey, history);
         return new RestoreRequestContext(previousCaller, previousHistory);
     }
 
-    private sealed class RestoreRequestContext(object? previousCaller, object? previousHistory) : IDisposable
+    public readonly struct RestoreRequestContext(object? previousCaller, object? previousHistory) : IDisposable
     {
         public void Dispose()
         {

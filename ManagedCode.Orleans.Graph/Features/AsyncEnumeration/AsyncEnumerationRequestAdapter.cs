@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using Orleans.Serialization.Invocation;
 
 namespace ManagedCode.Orleans.Graph.Features.AsyncEnumeration;
@@ -7,13 +8,13 @@ internal static class AsyncEnumerationRequestAdapter
     private static readonly Type _extensionType = typeof(IAsyncEnumerableGrainExtension);
     private const string StartMethodName = nameof(IAsyncEnumerableGrainExtension.StartEnumeration);
 
-    public static bool TryGetOriginal(IInvokable request, out IInvokable original)
+    public static bool TryGetOriginal(IInvokable request, [NotNullWhen(true)] out IInvokable? original)
     {
         ArgumentNullException.ThrowIfNull(request);
         if (request.GetInterfaceType() != _extensionType ||
             !string.Equals(request.GetMethod().Name, StartMethodName, StringComparison.Ordinal))
         {
-            original = null!;
+            original = null;
             return false;
         }
 
