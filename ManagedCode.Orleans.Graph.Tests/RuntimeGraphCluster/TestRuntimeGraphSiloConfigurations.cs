@@ -1,4 +1,5 @@
 using ManagedCode.Orleans.Graph.Extensions;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.TestingHost;
 
 namespace ManagedCode.Orleans.Graph.Tests.RuntimeGraphCluster;
@@ -7,6 +8,7 @@ public class TestRuntimeGraphSiloConfigurations : ISiloConfigurator
 {
     public void Configure(ISiloBuilder siloBuilder)
     {
+        siloBuilder.Services.AddSingleton<TimeProvider>(new MillisecondTimeProvider(TimeProvider.System));
         siloBuilder.UseInMemoryReminderService();
         siloBuilder.Configure<ReminderOptions>(options =>
         {
@@ -21,5 +23,11 @@ public class TestRuntimeGraphSiloConfigurations : ISiloConfigurator
                 filters.LiveGraphFlushPeriod = TimeSpan.FromMilliseconds(50);
             },
             configureGraph: graph => graph.AllowAll());
+    }
+
+    private sealed class MillisecondTimeProvider(TimeProvider systemClock) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() =>
+            DateTimeOffset.FromUnixTimeMilliseconds(systemClock.GetUtcNow().ToUnixTimeMilliseconds());
     }
 }

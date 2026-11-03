@@ -184,6 +184,10 @@ var liveMermaidGraph = await telemetry.GenerateLiveMermaidDiagramAsync();
 
 `liveGraph.Vertices` contains grain identities. `liveGraph.Edges` contains observed runtime transitions between those vertices, including `SourceMethod`, `TargetMethod`, hit count, and timestamps. The Mermaid API renders the same graph for visualization.
 
+`AddOrleansGraph` registers the system `TimeProvider` when the host has no provider configured. The incoming filter uses the provider resolved from DI. For a timestamped snapshot of request history, call `GrainTransitionManager.GetObservedGraph(callHistory, timeProvider)` with the provider from DI. When creating a manual observation with `ObservedGrainCall.Create`, pass a UTC `DateTime`.
+
+`FirstSeenUtc` and `LastSeenUtc` are serialized as UTC `DateTime` values. Upgrade silos and clients that exchange graph telemetry together when migrating from the `DateTimeOffset` model.
+
 Runtime vertices are exact graph identities. The client is represented as `ORLEANS_GRAIN_CLIENT`; grain vertices use the concrete Orleans grain interface or implementation identity resolved from Orleans call context. When Orleans exposes no resolvable caller identity, the runtime graph records `UNKNOWN_CALLER` instead of guessing. The runtime graph does not fall back to the base `Grain` class. Source methods use `*` only when Orleans does not expose a grain interface method for the source callback.
 
 Inspect the configured policy without parsing Mermaid.

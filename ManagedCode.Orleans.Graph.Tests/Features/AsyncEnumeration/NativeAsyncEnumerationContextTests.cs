@@ -114,7 +114,7 @@ public sealed class NativeAsyncEnumerationContextTests(AsyncEnumerationTestClust
             AssertAllowedLeaf(second.Current.Probe!, secondKey, nameof(IAsyncEnumerationSource.AllowedAsync));
             first.Current.SameHistoryBranch.ShouldBeTrue();
             second.Current.SameHistoryBranch.ShouldBeTrue();
-            disposalTimestamp = TimeProvider.System.GetTimestamp();
+            disposalTimestamp = fixture.TimeProvider.GetTimestamp();
         }
 
         var firstSettlement = await WaitForSettlementAsync(firstKey, disposalTimestamp, firstDeadline.Token);
@@ -127,21 +127,21 @@ public sealed class NativeAsyncEnumerationContextTests(AsyncEnumerationTestClust
         AsyncEnumerationExecutionCounters.Remove(secondKey);
     }
 
-    private static async Task<TimeSpan> WaitForSettlementAsync(string streamKey, long startTimestamp, CancellationToken deadline)
+    private async Task<TimeSpan> WaitForSettlementAsync(string streamKey, long startTimestamp, CancellationToken deadline)
     {
         var maximumElapsed = TimeSpan.FromSeconds(10);
         while (AsyncEnumerationExecutionCounters.Read(streamKey).Settled != 1)
         {
-            var remaining = maximumElapsed - TimeProvider.System.GetElapsedTime(startTimestamp);
+            var remaining = maximumElapsed - fixture.TimeProvider.GetElapsedTime(startTimestamp);
             if (remaining <= TimeSpan.Zero)
             {
                 throw new TimeoutException("Concurrent native stream did not settle within ten seconds.");
             }
 
-            await Task.Delay(TimeSpan.FromMilliseconds(Math.Min(10, remaining.TotalMilliseconds)), TimeProvider.System, deadline);
+            await Task.Delay(TimeSpan.FromMilliseconds(Math.Min(10, remaining.TotalMilliseconds)), fixture.TimeProvider, deadline);
         }
 
-        return TimeProvider.System.GetElapsedTime(startTimestamp);
+        return fixture.TimeProvider.GetElapsedTime(startTimestamp);
     }
 
     private static void AssertOriginRestored(string streamKey)
@@ -178,5 +178,5 @@ public sealed class NativeAsyncEnumerationContextTests(AsyncEnumerationTestClust
 
     private static string NewKey() => Guid.NewGuid().ToString("N");
 
-    private static CancellationTokenSource CreateDeadline() => new(_testOperationDeadline);
+    private CancellationTokenSource CreateDeadline() => new(_testOperationDeadline, fixture.TimeProvider);
 }

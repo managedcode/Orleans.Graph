@@ -7,6 +7,8 @@ namespace ManagedCode.Orleans.Graph.Tests;
 
 public class GrainTransitionManagerTests
 {
+    private static readonly DateTime _observedAtUtc = new(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+    private static readonly TimeProvider _timeProvider = new FixedTimeProvider(_observedAtUtc);
 
     [Test]
     public void IsTransitionAllowed_SingleValidTransition_ReturnsTrue()
@@ -227,7 +229,7 @@ public class GrainTransitionManagerTests
         callHistory.Push(new OutCall(grainAId, grainBId, typeof(IGrainA).FullName!, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1), nameof(IGrainA.MethodB1)));
         callHistory.Push(new InCall(grainAId, grainBId, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1)));
 
-        var graph = GrainTransitionManager.GetObservedGraph(callHistory);
+        var graph = GrainTransitionManager.GetObservedGraph(callHistory, _timeProvider);
         var edges = graph.Edges;
 
         graph.Vertices.Count.ShouldBe(3);
@@ -235,6 +237,13 @@ public class GrainTransitionManagerTests
         graph.Vertices.ShouldContain(vertex => vertex.Id == typeof(IGrainA).FullName);
         graph.Vertices.ShouldContain(vertex => vertex.Id == typeof(IGrainB).FullName);
         edges.Count.ShouldBe(2);
+        foreach (var edge in edges)
+        {
+            edge.FirstSeenUtc.ShouldBe(_observedAtUtc);
+            edge.LastSeenUtc.ShouldBe(_observedAtUtc);
+            edge.FirstSeenUtc.Kind.ShouldBe(DateTimeKind.Utc);
+        }
+
         edges.ShouldContain(edge =>
             edge.Source == Constants.ClientCallerId &&
             edge.Target == typeof(IGrainA).FullName &&
@@ -261,9 +270,11 @@ public class GrainTransitionManagerTests
         callHistory.Push(new OutCall(grainAId, grainBId, typeof(IGrainA).FullName!, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1), nameof(IGrainA.MethodB1)));
         callHistory.Push(new InCall(grainAId, grainBId, typeof(IGrainB).FullName!, nameof(IGrainB.MethodB1)));
 
-        var edge = GrainTransitionManager.GetLatestObservedCall(callHistory);
+        var edge = GrainTransitionManager.GetLatestObservedCall(callHistory, _timeProvider);
 
         edge.ShouldNotBeNull();
+        edge.FirstSeenUtc.ShouldBe(_observedAtUtc);
+        edge.LastSeenUtc.Kind.ShouldBe(DateTimeKind.Utc);
         edge.Source.ShouldBe(typeof(IGrainA).FullName);
         edge.Target.ShouldBe(typeof(IGrainB).FullName);
         edge.SourceMethod.ShouldBe(nameof(IGrainA.MethodB1));
@@ -283,7 +294,7 @@ public class GrainTransitionManagerTests
             nameof(IGrainA.MethodB2)));
         callHistory.Push(new InCall(null, null, typeof(IGrainB).FullName!, nameof(IGrainB.MethodC2)));
 
-        var graph = GrainTransitionManager.GetObservedGraph(callHistory);
+        var graph = GrainTransitionManager.GetObservedGraph(callHistory, _timeProvider);
 
         graph.Edges.ShouldContain(edge =>
             edge.Source == typeof(IGrainA).FullName &&
@@ -311,7 +322,7 @@ public class GrainTransitionManagerTests
             typeof(Grain).FullName!,
             nameof(IGrainA.MethodB1)));
 
-        var exception = Should.Throw<InvalidOperationException>(() => GrainTransitionManager.GetObservedGraph(callHistory));
+        var exception = Should.Throw<InvalidOperationException>(() => GrainTransitionManager.GetObservedGraph(callHistory, _timeProvider));
 
         exception.Message.ShouldContain("base Grain");
     }
@@ -807,12 +818,14 @@ public class GrainTransitionManagerTests
                 typeof(IGrainA).FullName!,
                 typeof(IGrainB).FullName!,
                 nameof(IGrainA.MethodA1),
-                nameof(IGrainB.MethodB1)),
+                nameof(IGrainB.MethodB1),
+                _observedAtUtc),
             ObservedGrainCall.Create(
                 typeof(IGrainA).FullName!,
                 typeof(IGrainB).FullName!,
                 nameof(IGrainA.MethodB1),
-                nameof(IGrainB.MethodC2))
+                nameof(IGrainB.MethodC2),
+                _observedAtUtc)
         };
 
         var graph = GrainTransitionManager.BuildObservedGraph(edges);
@@ -836,9 +849,9 @@ public class GrainTransitionManagerTests
         const string Method = "Run";
         var graph = GrainTransitionManager.BuildObservedGraph(
         [
-            ObservedGrainCall.Create(First, Second, Method, Method),
-            ObservedGrainCall.Create(Second, Third, Method, Method),
-            ObservedGrainCall.Create(Third, First, Method, Method)
+            ObservedGrainCall.Create(First, Second, Method, Method, _observedAtUtc),
+            ObservedGrainCall.Create(Second, Third, Method, Method, _observedAtUtc),
+            ObservedGrainCall.Create(Third, First, Method, Method, _observedAtUtc)
         ]);
 
         var diagram = GrainTransitionManager.GenerateObservedGraphMermaidDiagram(graph);
@@ -897,5 +910,10 @@ public class GrainTransitionManagerTests
         var diagram = graph.GenerateLiveMermaidDiagram(callHistory);
 
         diagram.ShouldContain("hits: 2");
+    }
+
+    private sealed class FixedTimeProvider(DateTime utcNow) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => utcNow;
     }
 }

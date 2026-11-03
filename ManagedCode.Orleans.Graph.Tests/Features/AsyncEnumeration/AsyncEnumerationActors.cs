@@ -64,7 +64,7 @@ public sealed partial class AsyncEnumerationSourceGrain : Grain, IAsyncEnumerati
     }
 }
 
-public sealed class AsyncEnumerationLeafGrain : Grain, IAsyncEnumerationLeaf
+public sealed class AsyncEnumerationLeafGrain(TimeProvider timeProvider) : Grain, IAsyncEnumerationLeaf
 {
     public Task<StreamProbe> ObserveAsync(string streamKey)
     {
@@ -76,7 +76,7 @@ public sealed class AsyncEnumerationLeafGrain : Grain, IAsyncEnumerationLeaf
             throw new InvalidOperationException("Native leaf invocation lost its Graph transition context.");
         }
 
-        var edge = GrainTransitionManager.GetLatestObservedCall(history)
+        var edge = GrainTransitionManager.GetLatestObservedCall(history, timeProvider)
             ?? throw new InvalidOperationException("Native leaf invocation has no observed Graph edge.");
         return Task.FromResult(new StreamProbe(
             streamKey,
@@ -91,7 +91,7 @@ public sealed class AsyncEnumerationLeafGrain : Grain, IAsyncEnumerationLeaf
     }
 }
 
-public sealed class AsyncEnumerationOriginGrain : Grain, IAsyncEnumerationOrigin
+public sealed class AsyncEnumerationOriginGrain(TimeProvider timeProvider) : Grain, IAsyncEnumerationOrigin
 {
     public Task<OriginResult> ReadAsync(string streamKey, CancellationToken cancellationToken) =>
         ReadStreamAsync(streamKey, false, cancellationToken);
@@ -144,7 +144,7 @@ public sealed class AsyncEnumerationOriginGrain : Grain, IAsyncEnumerationOrigin
                 first = enumerator.Current;
             }
 
-            disposalTimestamp = TimeProvider.System.GetTimestamp();
+            disposalTimestamp = timeProvider.GetTimestamp();
         }
 
         var producerSettlement = await WaitForProducerSettlementAsync(streamKey, disposalTimestamp, cancellationToken);
@@ -178,7 +178,7 @@ public sealed class AsyncEnumerationOriginGrain : Grain, IAsyncEnumerationOrigin
                 throw new InvalidOperationException("Native cancellation stream did not yield its first chunk.");
             }
 
-            cancelTimestamp = TimeProvider.System.GetTimestamp();
+            cancelTimestamp = timeProvider.GetTimestamp();
             await cancellation.CancelAsync();
             try
             {
@@ -207,7 +207,7 @@ public sealed class AsyncEnumerationOriginGrain : Grain, IAsyncEnumerationOrigin
             cancelToSettlement.Ticks);
     }
 
-    private static async Task<TimeSpan> WaitForProducerSettlementAsync(
+    private async Task<TimeSpan> WaitForProducerSettlementAsync(
         string streamKey,
         long startTimestamp,
         CancellationToken operationDeadline)
@@ -215,17 +215,17 @@ public sealed class AsyncEnumerationOriginGrain : Grain, IAsyncEnumerationOrigin
         var maximumElapsed = TimeSpan.FromSeconds(10);
         while (AsyncEnumerationExecutionCounters.Read(streamKey).Settled != 1)
         {
-            var elapsed = TimeProvider.System.GetElapsedTime(startTimestamp);
+            var elapsed = timeProvider.GetElapsedTime(startTimestamp);
             var remaining = maximumElapsed - elapsed;
             if (remaining <= TimeSpan.Zero)
             {
                 throw new TimeoutException("Native producer did not settle within ten seconds.");
             }
 
-            await Task.Delay(TimeSpan.FromMilliseconds(Math.Min(10, remaining.TotalMilliseconds)), TimeProvider.System, operationDeadline);
+            await Task.Delay(TimeSpan.FromMilliseconds(Math.Min(10, remaining.TotalMilliseconds)), timeProvider, operationDeadline);
         }
 
-        var totalElapsed = TimeProvider.System.GetElapsedTime(startTimestamp);
+        var totalElapsed = timeProvider.GetElapsedTime(startTimestamp);
         if (totalElapsed > maximumElapsed)
         {
             throw new TimeoutException("Native producer did not settle within ten seconds.");

@@ -7,7 +7,7 @@ namespace ManagedCode.Orleans.Graph.Tests.SystemTargetCluster;
 
 [PreferLocalPlacement]
 public sealed class SystemTargetCallerGrain(SystemTargetProbeClient client, ILocalSiloDetails localSilo,
-    SystemTargetProbeObservation observation)
+    SystemTargetProbeObservation observation, TimeProvider timeProvider)
     : Grain, ISystemTargetCallerGrain
 {
     public Task<SystemTargetProbeReply> CallServiceAsync(CancellationToken cancellationToken) =>
@@ -34,7 +34,7 @@ public sealed class SystemTargetCallerGrain(SystemTargetProbeClient client, ILoc
         observation.RecordCallbackExecution();
         var history = RequestContext.Get(Constants.RequestContextKey) as CallHistory
             ?? throw new InvalidOperationException("The native callback has no application history.");
-        var edge = GrainTransitionManager.GetLatestObservedCall(history)
+        var edge = GrainTransitionManager.GetLatestObservedCall(history, timeProvider)
             ?? throw new InvalidOperationException("The native callback has no observed edge.");
         var sourceId = history.History.Peek().SourceId?.ToString()
             ?? throw new InvalidOperationException("The native callback has no source identity.");

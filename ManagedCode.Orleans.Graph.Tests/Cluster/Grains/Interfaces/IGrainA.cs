@@ -13,7 +13,7 @@ public interface IGrainA : IGrainWithStringKey
 
     Task<int> MethodComplexFlow(int input);
 
-    Task<int> MethodGrainOnlyComplexFlow(int input, DateTimeOffset startedAt);
+    Task<int> MethodGrainOnlyComplexFlow(int input, DateTime startedAt);
 
     Task<int[]> ObserveParallelCallHistoryAsync(int calls);
 

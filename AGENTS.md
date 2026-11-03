@@ -47,6 +47,7 @@ Update guidelines:
 - **Test Framework**: Use TUnit for tests and Shouldly for assertions; do not introduce FluentAssertions, so the test style stays aligned with the newer ManagedCode Orleans projects.
 - **Migration Releases**: For major framework/package migrations, complete three strict code-review-and-fix iterations before README polish, feature additions, commit, push, and CI verification, so release branches are hardened before publication.
 - **Performance Review**: Update NuGet dependencies before taking the baseline. Review with Roslynk and profile the Orleans workload in Release. Verify each fix against the same operation before starting the next review. Complete the requested review and control passes before bumping the patch version and pushing the release.
+- **Current Time**: Resolve `TimeProvider` from DI wherever application code reads the current date or time. Register the system clock only at the composition root and pass the injected provider or its timestamp to static helpers.
 - **Code Style**: Use enums or constants over magic literals, keep documentation and comments in English, and avoid template placeholders—name files and types for their real domain roles.
 
 

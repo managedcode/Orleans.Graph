@@ -16,7 +16,8 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
     public async Task AllowAll_RecordsClientAndGrainRuntimeEdgesAsync()
     {
         await ResetTelemetryAsync(_fixture.Cluster.Client);
-        var startedAt = DateTimeOffset.UtcNow;
+        var timeProvider = GetPrimarySiloServices().GetRequiredService<TimeProvider>();
+        var startedAt = timeProvider.GetUtcNow().UtcDateTime;
 
         await _fixture.Cluster.Client
             .GetGrain<IGrainA>("runtime")
@@ -47,7 +48,13 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
         clientEdge.Count.ShouldBe(1);
         grainEdge.Count.ShouldBe(1);
         clientEdge.FirstSeenUtc.ShouldBeLessThanOrEqualTo(clientEdge.LastSeenUtc);
+        clientEdge.FirstSeenUtc.Kind.ShouldBe(DateTimeKind.Utc);
+        (clientEdge.FirstSeenUtc.Ticks % TimeSpan.TicksPerMillisecond).ShouldBe(0L);
+        clientEdge.FirstSeenUtc.ShouldBeGreaterThanOrEqualTo(startedAt);
         grainEdge.LastSeenUtc.ShouldBeGreaterThanOrEqualTo(startedAt);
+        grainEdge.LastSeenUtc.ShouldBeLessThanOrEqualTo(timeProvider.GetUtcNow().UtcDateTime);
+        grainEdge.LastSeenUtc.Kind.ShouldBe(DateTimeKind.Utc);
+        (grainEdge.LastSeenUtc.Ticks % TimeSpan.TicksPerMillisecond).ShouldBe(0L);
     }
 
     [Test]
@@ -226,7 +233,7 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
 
         var result = await _fixture.Cluster.Client
             .GetGrain<IGrainA>("grain-only-complex-flow")
-            .MethodGrainOnlyComplexFlow(1, DateTimeOffset.UtcNow);
+            .MethodGrainOnlyComplexFlow(1, GetPrimarySiloServices().GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime);
 
         result.ShouldBe(5);
 
@@ -253,7 +260,7 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
 
         var result = await grainFactory
             .GetGrain<IGrainA>("grain-factory-complex-flow")
-            .MethodGrainOnlyComplexFlow(1, DateTimeOffset.UtcNow);
+            .MethodGrainOnlyComplexFlow(1, GetPrimarySiloServices().GetRequiredService<TimeProvider>().GetUtcNow().UtcDateTime);
 
         result.ShouldBe(5);
 
@@ -445,11 +452,12 @@ public class RuntimeGraphTests(TestRuntimeGraphClusterApplication fixture)
         edges.Any(IsTelemetryEdge).ShouldBeFalse();
     }
 
-    private IGrainFactory GetPrimarySiloGrainFactory()
+    private IGrainFactory GetPrimarySiloGrainFactory() => GetPrimarySiloServices().GetRequiredService<IGrainFactory>();
+
+    private IServiceProvider GetPrimarySiloServices()
     {
         var primary = _fixture.Cluster.Primary ?? throw new InvalidOperationException("The primary test silo is unavailable.");
-        var serviceProvider = _fixture.Cluster.GetSiloServiceProvider(primary.SiloAddress);
-        return serviceProvider.GetRequiredService<IGrainFactory>();
+        return _fixture.Cluster.GetSiloServiceProvider(primary.SiloAddress);
     }
 
     private static async Task ResetTelemetryAsync(IGrainFactory grainFactory)

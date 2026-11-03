@@ -9,13 +9,17 @@ public sealed record ObservedGrainCall(
     [property: Id(2)] string SourceMethod,
     [property: Id(3)] string TargetMethod,
     [property: Id(4)] long Count,
-    [property: Id(5)] DateTimeOffset FirstSeenUtc,
-    [property: Id(6)] DateTimeOffset LastSeenUtc)
+    [property: Id(5)] DateTime FirstSeenUtc,
+    [property: Id(6)] DateTime LastSeenUtc)
 {
-    public static ObservedGrainCall Create(string source, string target, string sourceMethod, string targetMethod)
+    public static ObservedGrainCall Create(string source, string target, string sourceMethod, string targetMethod, DateTime observedAtUtc)
     {
-        var now = DateTimeOffset.UtcNow;
-        return new ObservedGrainCall(source, target, sourceMethod, targetMethod, 1, now, now);
+        if (observedAtUtc.Kind != DateTimeKind.Utc)
+        {
+            throw new ArgumentException("The observation timestamp must be UTC.", nameof(observedAtUtc));
+        }
+
+        return new ObservedGrainCall(source, target, sourceMethod, targetMethod, 1, observedAtUtc, observedAtUtc);
     }
 
     public ObservedGrainCall Merge(ObservedGrainCall call)
@@ -31,7 +35,7 @@ public sealed record ObservedGrainCall(
         return Merge(call.Count, call.FirstSeenUtc, call.LastSeenUtc);
     }
 
-    internal ObservedGrainCall Merge(long count, DateTimeOffset firstSeenUtc, DateTimeOffset lastSeenUtc)
+    internal ObservedGrainCall Merge(long count, DateTime firstSeenUtc, DateTime lastSeenUtc)
     {
         return this with
         {

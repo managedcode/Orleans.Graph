@@ -3,6 +3,7 @@ using ManagedCode.Orleans.Graph.Features.AsyncEnumeration;
 using ManagedCode.Orleans.Graph.Filters;
 using ManagedCode.Orleans.Graph.Models;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace ManagedCode.Orleans.Graph.Extensions;
 
@@ -22,6 +23,7 @@ public static class OrleansGraphExtensions
         var filterConfig = new GraphCallFilterConfig();
         configureFilters?.Invoke(filterConfig);
         builder.Services.AddSingleton(filterConfig);
+        builder.Services.TryAddSingleton(TimeProvider.System);
 
         builder.AddIncomingGrainCallFilter<GraphIncomingGrainCallFilter>();
         builder.AddOutgoingGrainCallFilter<GraphOutgoingGrainCallFilter>();

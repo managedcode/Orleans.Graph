@@ -1,6 +1,7 @@
 using ManagedCode.Orleans.Graph.Interfaces;
 using ManagedCode.Orleans.Graph.Models;
 using ManagedCode.Orleans.Graph.Tests.Cluster.Grains.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace ManagedCode.Orleans.Graph.Tests.Cluster.Grains;
 
@@ -59,7 +60,7 @@ public class GrainA : Grain, IGrainA, IRemindable
         return await RunBranchingFlowAsync(input);
     }
 
-    public async Task<int> MethodGrainOnlyComplexFlow(int input, DateTimeOffset startedAt)
+    public async Task<int> MethodGrainOnlyComplexFlow(int input, DateTime startedAt)
     {
         await ClearRuntimeGraphTelemetryAsync(startedAt);
 
@@ -198,11 +199,12 @@ public class GrainA : Grain, IGrainA, IRemindable
         }
     }
 
-    private async Task ClearRuntimeGraphTelemetryAsync(DateTimeOffset startedAt)
+    private async Task ClearRuntimeGraphTelemetryAsync(DateTime startedAt)
     {
         var telemetry = GrainFactory.GetGrain<IOrleansGraphTelemetryGrain>(Constants.LiveGraphTelemetryGrainKey);
+        var timeProvider = GrainContext.ActivationServices.GetRequiredService<TimeProvider>();
         if (RequestContext.Get(Constants.RequestContextKey) is CallHistory history &&
-            GrainTransitionManager.GetLatestObservedCall(history) is { } incomingCall)
+            GrainTransitionManager.GetLatestObservedCall(history, timeProvider) is { } incomingCall)
         {
             // Wait for the silo-local worker to publish the entry edge before clearing it.
             var key = ObservedGrainCallKey.From(incomingCall);

@@ -14,6 +14,7 @@ public class GraphIncomingGrainCallFilter(IServiceProvider serviceProvider, Grap
     private readonly GrainTransitionManager? _graphManager = serviceProvider.GetService<GrainTransitionManager>();
     private readonly IGrainFactory? _grainFactory = serviceProvider.GetService<IGrainFactory>();
     private readonly AsyncEnumerationFactoryCatalog? _enumerationCatalog = serviceProvider.GetService<AsyncEnumerationFactoryCatalog>();
+    private readonly TimeProvider _timeProvider = serviceProvider.GetRequiredService<TimeProvider>();
 
     public async Task Invoke(IIncomingGrainCallContext context)
     {
@@ -83,7 +84,7 @@ public class GraphIncomingGrainCallFilter(IServiceProvider serviceProvider, Grap
             return;
         }
 
-        var observedCall = GrainTransitionManager.GetLatestObservedCall(callHistory);
+        var observedCall = GrainTransitionManager.GetLatestObservedCall(callHistory, _timeProvider);
         if (observedCall is null)
         {
             return;

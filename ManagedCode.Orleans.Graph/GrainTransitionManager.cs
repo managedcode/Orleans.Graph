@@ -411,7 +411,8 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
     {
         ArgumentNullException.ThrowIfNull(callHistory);
 
-        return GenerateMermaidDiagramInternal(GetObservedCalls(callHistory));
+        // Mermaid uses identities and counts only. No timestamps need to be generated.
+        return GenerateMermaidDiagramInternal(GetObservedCalls(callHistory, timeProvider: null));
     }
 
     public string GenerateLiveMermaidDiagram(ObservedGrainCallGraph observedGraph)
@@ -497,20 +498,21 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
             : GenerateLiveMermaidDiagram(callHistory);
     }
 
-    public static ObservedGrainCallGraph GetObservedGraph(CallHistory callHistory)
+    public static ObservedGrainCallGraph GetObservedGraph(CallHistory callHistory, TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(callHistory);
+        ArgumentNullException.ThrowIfNull(timeProvider);
 
-        var observedCalls = GetObservedCalls(callHistory);
+        var observedCalls = GetObservedCalls(callHistory, timeProvider);
         return BuildObservedGraphFromSnapshot(observedCalls as ObservedGrainCall[] ?? observedCalls.ToArray());
     }
 
-    private static IReadOnlyCollection<ObservedGrainCall> GetObservedCalls(CallHistory callHistory)
+    private static IReadOnlyCollection<ObservedGrainCall> GetObservedCalls(CallHistory callHistory, TimeProvider? timeProvider)
     {
         var calls = callHistory.History;
         if (calls.Count <= 2)
         {
-            var observedCall = GetLatestObservedCall(callHistory);
+            var observedCall = GetLatestObservedCallCore(callHistory, timeProvider);
             return observedCall is null ? Array.Empty<ObservedGrainCall>() : new[] { observedCall };
         }
 
@@ -539,7 +541,7 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
                 GetObservedSource(currentCall),
                 GetObservedTarget(nextCall),
                 sourceMethod,
-                nextCall.Method));
+                nextCall.Method), timeProvider?.GetUtcNow().UtcDateTime ?? DateTime.UnixEpoch);
 
             nextCall = currentCall;
         }
@@ -547,10 +549,16 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
         return edges is null ? Array.Empty<ObservedGrainCall>() : edges.Values;
     }
 
-    public static ObservedGrainCall? GetLatestObservedCall(CallHistory callHistory)
+    public static ObservedGrainCall? GetLatestObservedCall(CallHistory callHistory, TimeProvider timeProvider)
     {
         ArgumentNullException.ThrowIfNull(callHistory);
+        ArgumentNullException.ThrowIfNull(timeProvider);
 
+        return GetLatestObservedCallCore(callHistory, timeProvider);
+    }
+
+    private static ObservedGrainCall? GetLatestObservedCallCore(CallHistory callHistory, TimeProvider? timeProvider)
+    {
         if (callHistory.IsEmpty())
         {
             return null;
@@ -563,7 +571,8 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
                 Constants.ClientCallerId,
                 GetObservedTarget(incomingClientCall),
                 Constants.AnyMethod,
-                incomingClientCall.Method);
+                incomingClientCall.Method,
+                timeProvider?.GetUtcNow().UtcDateTime ?? DateTime.UnixEpoch);
         }
 
         if (calls.Count < 2)
@@ -598,7 +607,8 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
             GetObservedSource(outgoingCall),
             GetObservedTarget(incomingCall),
             sourceMethod,
-            incomingCall.Method);
+            incomingCall.Method,
+            timeProvider?.GetUtcNow().UtcDateTime ?? DateTime.UnixEpoch);
     }
 
     private string GenerateMermaidDiagramInternal(IReadOnlyCollection<ObservedGrainCall>? observedCalls)
@@ -818,13 +828,12 @@ public class GrainTransitionManager(DirectedGraph grainGraph, bool allowAllByDef
             $"Unable to resolve source method for outgoing call from {outCall.Caller} to {outCall.Interface}.{outCall.Method}.");
     }
 
-    private static void AddObservedEdge(Dictionary<ObservedGrainCallKey, ObservedGrainCall> edges, ObservedGrainCallKey key)
+    private static void AddObservedEdge(Dictionary<ObservedGrainCallKey, ObservedGrainCall> edges, ObservedGrainCallKey key, DateTime observedAtUtc)
     {
-        var now = DateTimeOffset.UtcNow;
         ref var existing = ref CollectionsMarshal.GetValueRefOrAddDefault(edges, key, out var exists);
         existing = exists
-            ? existing!.Merge(1, now, now)
-            : new ObservedGrainCall(key.Source, key.Target, key.SourceMethod, key.TargetMethod, 1, now, now);
+            ? existing!.Merge(1, observedAtUtc, observedAtUtc)
+            : ObservedGrainCall.Create(key.Source, key.Target, key.SourceMethod, key.TargetMethod, observedAtUtc);
     }
 
     private static string GetObservedSource(Call call)

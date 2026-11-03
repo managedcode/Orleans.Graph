@@ -31,7 +31,8 @@ public class RuntimeGraphTelemetryLifecycleTests
             "source",
             "target",
             "SourceMethod",
-            "TargetMethod"));
+            "TargetMethod",
+            DateTime.UnixEpoch));
 
         await fixture.Cluster.Client
             .GetGrain<IManagementGrain>(0)
@@ -58,7 +59,7 @@ public class RuntimeGraphTelemetryLifecycleTests
         }
         var worker = fixture.Cluster.Client.GetGrain<IOrleansGraphTelemetryWorker>(Constants.LiveGraphTelemetryGrainKey);
         await worker.RecordObservedCallAsync(ObservedGrainCall.Create(
-            "source", "target", "SourceMethod", "TargetMethod"));
+            "source", "target", "SourceMethod", "TargetMethod", DateTime.UnixEpoch));
 
         await fixture.Cluster.StopAllSilosAsync();
 
@@ -74,7 +75,7 @@ public class RuntimeGraphTelemetryLifecycleTests
         var grains = fixture.Cluster.Client;
         var worker = grains.GetGrain<IOrleansGraphTelemetryWorker>(Constants.LiveGraphTelemetryGrainKey);
         await worker.RecordObservedCallAsync(ObservedGrainCall.Create(
-            "source", "target", "SourceMethod", "TargetMethod"));
+            "source", "target", "SourceMethod", "TargetMethod", DateTime.UnixEpoch));
 
         using var logs = new ShutdownTelemetryLogObserver();
         foreach (var silo in fixture.Cluster.Silos)

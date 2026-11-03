@@ -14,7 +14,7 @@ public sealed class SystemTargetProbeGrainService(GrainId id, Silo silo, ILogger
     {
         await base.Init(serviceProvider);
         _grainFactory = serviceProvider.GetRequiredService<IGrainFactory>();
-        using var deadline = new CancellationTokenSource(SystemTargetTestProtocol.RpcTimeout, TimeProvider.System);
+        using var deadline = new CancellationTokenSource(SystemTargetTestProtocol.RpcTimeout, serviceProvider.GetRequiredService<TimeProvider>());
         try
         {
             var client = serviceProvider.GetRequiredService<SystemTargetProbeClient>();

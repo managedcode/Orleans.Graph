@@ -5,8 +5,8 @@ namespace ManagedCode.Orleans.Graph.Telemetry;
 internal struct ObservedGrainCallAccumulator(ObservedGrainCall observedCall)
 {
     private long _count = observedCall.Count;
-    private DateTimeOffset _firstSeenUtc = observedCall.FirstSeenUtc;
-    private DateTimeOffset _lastSeenUtc = observedCall.LastSeenUtc;
+    private DateTime _firstSeenUtc = observedCall.FirstSeenUtc;
+    private DateTime _lastSeenUtc = observedCall.LastSeenUtc;
 
     public void Merge(ObservedGrainCall observedCall)
     {

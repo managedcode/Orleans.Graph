@@ -1,5 +1,6 @@
 using ManagedCode.Orleans.Graph.Extensions;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.TestingHost;
 
 namespace ManagedCode.Orleans.Graph.Tests.Features.AsyncEnumeration;
@@ -15,9 +16,11 @@ public sealed class AsyncEnumerationTestCluster : IAsyncDisposable
         builder.AddClientBuilderConfigurator<AsyncEnumerationClientConfiguration>();
         Cluster = builder.Build();
         Cluster.Deploy();
+        TimeProvider = Cluster.GetSiloServiceProvider(Cluster.Primary!.SiloAddress).GetRequiredService<TimeProvider>();
     }
 
     public TestCluster Cluster { get; }
+    public TimeProvider TimeProvider { get; }
 
     public async ValueTask DisposeAsync()
     {

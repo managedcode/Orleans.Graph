@@ -18,12 +18,12 @@ public sealed class NativeAsyncEnumerationLifetimeTests(AsyncEnumerationTestClus
         var source = fixture.Cluster.Client.GetGrain<IAsyncEnumerationSource>(streamKey);
         var stream = source.CancellableAsync(streamKey, cancellation.Token);
         SetNativeBatchSize(stream, 1);
-        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30), fixture.TimeProvider);
         var cancelTimestamp = 0L;
         await using (var enumerator = stream.GetAsyncEnumerator(deadline.Token))
         {
             (await enumerator.MoveNextAsync()).ShouldBeTrue();
-            cancelTimestamp = TimeProvider.System.GetTimestamp();
+            cancelTimestamp = fixture.TimeProvider.GetTimestamp();
             await cancellation.CancelAsync();
             await Should.ThrowAsync<OperationCanceledException>(() => enumerator.MoveNextAsync().AsTask());
         }
@@ -46,7 +46,7 @@ public sealed class NativeAsyncEnumerationLifetimeTests(AsyncEnumerationTestClus
         await using (var enumerator = stream.GetAsyncEnumerator(deadline.Token))
         {
             (await enumerator.MoveNextAsync()).ShouldBeTrue();
-            disposalTimestamp = TimeProvider.System.GetTimestamp();
+            disposalTimestamp = fixture.TimeProvider.GetTimestamp();
         }
 
         var disposalToSettlement = await WaitForSettlementAsync(streamKey, disposalTimestamp, deadline.Token);
@@ -55,21 +55,21 @@ public sealed class NativeAsyncEnumerationLifetimeTests(AsyncEnumerationTestClus
         AsyncEnumerationExecutionCounters.Remove(streamKey);
     }
 
-    private static async Task<TimeSpan> WaitForSettlementAsync(string streamKey, long startTimestamp, CancellationToken deadline)
+    private async Task<TimeSpan> WaitForSettlementAsync(string streamKey, long startTimestamp, CancellationToken deadline)
     {
         var maximumElapsed = TimeSpan.FromSeconds(10);
         while (AsyncEnumerationExecutionCounters.Read(streamKey).Settled != 1)
         {
-            var remaining = maximumElapsed - TimeProvider.System.GetElapsedTime(startTimestamp);
+            var remaining = maximumElapsed - fixture.TimeProvider.GetElapsedTime(startTimestamp);
             if (remaining <= TimeSpan.Zero)
             {
                 throw new TimeoutException("Native producer did not settle within ten seconds.");
             }
 
-            await Task.Delay(TimeSpan.FromMilliseconds(Math.Min(10, remaining.TotalMilliseconds)), TimeProvider.System, deadline);
+            await Task.Delay(TimeSpan.FromMilliseconds(Math.Min(10, remaining.TotalMilliseconds)), fixture.TimeProvider, deadline);
         }
 
-        return TimeProvider.System.GetElapsedTime(startTimestamp);
+        return fixture.TimeProvider.GetElapsedTime(startTimestamp);
     }
 
     private static void SetNativeBatchSize(IAsyncEnumerable<StreamItem> stream, int batchSize)
@@ -81,5 +81,5 @@ public sealed class NativeAsyncEnumerationLifetimeTests(AsyncEnumerationTestClus
 
     private static string NewKey() => Guid.NewGuid().ToString("N");
 
-    private static CancellationTokenSource CreateDeadline() => new(_testOperationDeadline);
+    private CancellationTokenSource CreateDeadline() => new(_testOperationDeadline, fixture.TimeProvider);
 }
