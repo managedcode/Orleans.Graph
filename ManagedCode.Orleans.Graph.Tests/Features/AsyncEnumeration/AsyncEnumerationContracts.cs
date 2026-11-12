@@ -71,6 +71,14 @@ public interface IAsyncEnumerationSource : IGrainWithStringKey
     IAsyncEnumerable<StreamItem> CancellableAsync(string streamKey, CancellationToken cancellationToken);
 
     Task<StreamCounts> GetCountsAsync();
+
+    IAsyncEnumerable<int> CallbacksAsync();
+
+    Task<int> CallLeafAsync();
+
+    Task<int> AcceptCallbackAsync();
+
+    Task<int> GetCallbackCountAsync();
 }
 
 public interface IInheritedAsyncEnumeration<TItem> : IGrainWithStringKey
@@ -87,6 +95,8 @@ public interface IClosedInheritedAsyncEnumerationSource : IInheritedAsyncEnumera
 public interface IAsyncEnumerationLeaf : IGrainWithStringKey
 {
     Task<StreamProbe> ObserveAsync(string streamKey);
+
+    Task<int> ReturnToSourceAsync(string streamKey);
 }
 
 public interface IAsyncEnumerationOrigin : IGrainWithStringKey

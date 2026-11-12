@@ -8,6 +8,24 @@ namespace ManagedCode.Orleans.Graph.Tests.Features.AsyncEnumeration;
 public sealed partial class AsyncEnumerationSourceGrain : Grain, IAsyncEnumerationSource, IAsyncEnumerationCatalogProbe,
     IClosedInheritedAsyncEnumerationSource
 {
+    private int _callbackCount;
+
+    public async IAsyncEnumerable<int> CallbacksAsync()
+    {
+        yield return await CallLeafAsync();
+        yield return await CallLeafAsync();
+    }
+
+    public Task<int> CallLeafAsync()
+    {
+        var key = this.GetPrimaryKeyString();
+        return GrainFactory.GetGrain<IAsyncEnumerationLeaf>(key).ReturnToSourceAsync(key);
+    }
+
+    public Task<int> AcceptCallbackAsync() => Task.FromResult(++_callbackCount);
+
+    public Task<int> GetCallbackCountAsync() => Task.FromResult(_callbackCount);
+
     public IAsyncEnumerable<StreamItem> AllowedAsync(string streamKey) => EnumerateAsync(streamKey, false);
 
     public IAsyncEnumerable<StreamItem> InheritedAsync(string streamKey) => EnumerateAsync(streamKey, false);
@@ -66,6 +84,9 @@ public sealed partial class AsyncEnumerationSourceGrain : Grain, IAsyncEnumerati
 
 public sealed class AsyncEnumerationLeafGrain(TimeProvider timeProvider) : Grain, IAsyncEnumerationLeaf
 {
+    public Task<int> ReturnToSourceAsync(string streamKey) =>
+        GrainFactory.GetGrain<IAsyncEnumerationSource>(streamKey).AcceptCallbackAsync();
+
     public Task<StreamProbe> ObserveAsync(string streamKey)
     {
         AsyncEnumerationExecutionCounters.LeafEntered(streamKey);

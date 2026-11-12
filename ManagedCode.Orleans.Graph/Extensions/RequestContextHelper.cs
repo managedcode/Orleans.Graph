@@ -24,11 +24,12 @@ public static class RequestContextHelper
         var methodName = request.GetMethodName();
         EnsureValidGrainIdentity(interfaceName, methodName);
 
+        // For streams, Orleans schedules the native extension request. The nested request identifies the policy edge.
         var call = GetOrCreateCallHistory(out var created);
         call.Push(new InCall(context.SourceId, context.TargetId, interfaceName, methodName)
         {
-            InvocationOptions = GetInvocationOptions(request),
-            MayInterleave = MayInterleavePredicateCache.Allows(context.TargetContext.GrainInstance!, request)
+            InvocationOptions = GetInvocationOptions(context.Request),
+            MayInterleave = MayInterleavePredicateCache.Allows(context.TargetContext.GrainInstance!, context.Request)
         });
         if (created)
         {
@@ -97,7 +98,7 @@ public static class RequestContextHelper
         var call = GetOrCreateCallHistory(out var created);
         call.Push(new OutCall(context.SourceId, context.TargetId, callerContext.Caller, interfaceName, methodName, callerContext.Method)
         {
-            InvocationOptions = GetInvocationOptions(request)
+            InvocationOptions = GetInvocationOptions(context.Request)
         });
         if (created)
         {
