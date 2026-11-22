@@ -9,18 +9,30 @@ using Orleans.Serialization.Invocation;
 
 namespace ManagedCode.Orleans.Graph.Filters;
 
-public class GraphIncomingGrainCallFilter(IServiceProvider serviceProvider, GraphCallFilterConfig graphCallFilterConfig) : IIncomingGrainCallFilter
+public class GraphIncomingGrainCallFilter : IIncomingGrainCallFilter
 {
-    private readonly GrainTransitionManager? _graphManager = serviceProvider.GetService<GrainTransitionManager>();
-    private readonly IGrainFactory? _grainFactory = serviceProvider.GetService<IGrainFactory>();
-    private readonly AsyncEnumerationFactoryCatalog? _enumerationCatalog = serviceProvider.GetService<AsyncEnumerationFactoryCatalog>();
-    private readonly TimeProvider _timeProvider = serviceProvider.GetRequiredService<TimeProvider>();
+    private readonly GraphCallFilterConfig _graphCallFilterConfig;
+    private readonly GrainTransitionManager? _graphManager;
+    private readonly IGrainFactory? _grainFactory;
+    private readonly AsyncEnumerationFactoryCatalog? _enumerationCatalog;
+    private readonly TimeProvider _timeProvider;
+    private readonly ObservedCallBatcher? _batcher;
+
+    public GraphIncomingGrainCallFilter(IServiceProvider serviceProvider, GraphCallFilterConfig graphCallFilterConfig)
+    {
+        _graphCallFilterConfig = graphCallFilterConfig;
+        _graphManager = serviceProvider.GetService<GrainTransitionManager>();
+        _grainFactory = serviceProvider.GetService<IGrainFactory>();
+        _enumerationCatalog = serviceProvider.GetService<AsyncEnumerationFactoryCatalog>();
+        _timeProvider = serviceProvider.GetRequiredService<TimeProvider>();
+        _batcher = _grainFactory is { } grainFactory ? new ObservedCallBatcher(grainFactory) : null;
+    }
 
     public async Task Invoke(IIncomingGrainCallContext context)
     {
         var currentCaller = RequestContextHelper.CaptureCurrentCaller();
         AsyncEnumerationRequestAdapter.TryGetOriginal(context.Request, out var originalRequest);
-        var tracked = context.TrackIncomingCall(graphCallFilterConfig, originalRequest);
+        var tracked = context.TrackIncomingCall(_graphCallFilterConfig, originalRequest);
         var previousHistory = context.Request is IRequest request && (request.Options & InvokeMethodOptions.OneWay) != 0
             ? RequestContext.Get(Constants.RequestContextKey) as CallHistory
             : null;
@@ -79,7 +91,7 @@ public class GraphIncomingGrainCallFilter(IServiceProvider serviceProvider, Grap
 
     private async Task ReportObservedEdgeAsync(IIncomingGrainCallContext context, CallHistory callHistory, bool isTelemetryCall)
     {
-        if (!graphCallFilterConfig.EnableLiveGraphTelemetry)
+        if (!_graphCallFilterConfig.EnableLiveGraphTelemetry)
         {
             return;
         }
@@ -106,12 +118,13 @@ public class GraphIncomingGrainCallFilter(IServiceProvider serviceProvider, Grap
             return;
         }
 
-        // The async method scopes RequestContext changes to this telemetry call.
-        if (!graphCallFilterConfig.TrackOrleansGraphInternalCalls)
+        if (!_graphCallFilterConfig.TrackOrleansGraphInternalCalls)
         {
-            RequestContext.Remove(Constants.RequestContextKey);
+            await _batcher!.ReportAsync(observedCall);
+            return;
         }
 
+        // Internal tracking attributes the telemetry RPC to this exact caller.
         RequestContext.Set(Constants.TelemetrySuppressionContextKey, true);
         await _grainFactory
             .GetGrain<IOrleansGraphTelemetryWorker>(Constants.LiveGraphTelemetryGrainKey)
